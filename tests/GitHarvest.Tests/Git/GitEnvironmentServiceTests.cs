@@ -17,7 +17,7 @@ public class GitEnvironmentServiceTests : IDisposable
     [Fact]
     public async Task 自动探测到本机git并给出版本与来源()
     {
-        var service = CreateService(GitExecutableLocator.ForCurrentEnvironment(), settingsFilePath: null);
+        var service = CreateService(GitExecutableLocator.ForCurrentEnvironment());
 
         var status = await service.GetStatusAsync();
 
@@ -33,7 +33,7 @@ public class GitEnvironmentServiceTests : IDisposable
     [Fact]
     public async Task 三级都没找到时给出安装引导()
     {
-        var service = CreateService(new GitExecutableLocator([], []), settingsFilePath: null);
+        var service = CreateService(new GitExecutableLocator([], []));
 
         var status = await service.GetStatusAsync();
 
@@ -49,8 +49,7 @@ public class GitEnvironmentServiceTests : IDisposable
     {
         var brokenExecutable = TestGit.CreateUnrunnable(Path.Combine(_directory.Path, "on-path"));
         var service = CreateService(
-            new GitExecutableLocator([Path.GetDirectoryName(brokenExecutable)!], []),
-            settingsFilePath: null);
+            new GitExecutableLocator([Path.GetDirectoryName(brokenExecutable)!], []));
 
         var status = await service.GetStatusAsync();
 
@@ -62,8 +61,10 @@ public class GitEnvironmentServiceTests : IDisposable
     [Fact]
     public async Task 设置中手动指定的可用路径优先于自动探测()
     {
-        WriteSettings(gitExecutablePath: TestGit.ExecutablePath);
-        var service = CreateService(GitExecutableLocator.ForCurrentEnvironment(), SettingsFilePath);
+        // 用真实 SettingsService 保存手动路径（ticket 03 起设置走内存快照 + 落盘）
+        var settings = CreateSettingsService();
+        settings.Save(new GlobalSettings { GitExecutablePath = TestGit.ExecutablePath });
+        var service = CreateService(GitExecutableLocator.ForCurrentEnvironment(), settings);
 
         var status = await service.GetStatusAsync();
 
@@ -76,8 +77,9 @@ public class GitEnvironmentServiceTests : IDisposable
     public async Task 设置中手动路径不可用时回退到自动探测()
     {
         var brokenExecutable = TestGit.CreateUnrunnable(Path.Combine(_directory.Path, "manual"));
-        WriteSettings(gitExecutablePath: brokenExecutable);
-        var service = CreateService(GitExecutableLocator.ForCurrentEnvironment(), SettingsFilePath);
+        var settings = CreateSettingsService();
+        settings.Save(new GlobalSettings { GitExecutablePath = brokenExecutable });
+        var service = CreateService(GitExecutableLocator.ForCurrentEnvironment(), settings);
 
         var status = await service.GetStatusAsync();
 
@@ -89,7 +91,7 @@ public class GitEnvironmentServiceTests : IDisposable
     [Fact]
     public async Task 自检结果被缓存()
     {
-        var service = CreateService(GitExecutableLocator.ForCurrentEnvironment(), settingsFilePath: null);
+        var service = CreateService(GitExecutableLocator.ForCurrentEnvironment());
 
         var first = await service.GetStatusAsync();
         var second = await service.GetStatusAsync();
@@ -100,11 +102,16 @@ public class GitEnvironmentServiceTests : IDisposable
     [Fact]
     public async Task 重新探测会重读设置并反映最新状态()
     {
-        WriteSettings(gitExecutablePath: TestGit.CreateUnrunnable(Path.Combine(_directory.Path, "manual")));
-        var service = CreateService(new GitExecutableLocator([], []), SettingsFilePath);
+        // 模拟 ticket 12 的真实流程：设置页保存（ISettingsService.Save）→ 触发重新探测。
+        var settings = CreateSettingsService();
+        settings.Save(new GlobalSettings
+        {
+            GitExecutablePath = TestGit.CreateUnrunnable(Path.Combine(_directory.Path, "manual")),
+        });
+        var service = CreateService(new GitExecutableLocator([], []), settings);
 
         var before = await service.GetStatusAsync();
-        WriteSettings(gitExecutablePath: TestGit.ExecutablePath);
+        settings.Save(new GlobalSettings { GitExecutablePath = TestGit.ExecutablePath });
         var after = await service.RefreshAsync();
 
         Assert.False(before.IsAvailable);
@@ -118,7 +125,7 @@ public class GitEnvironmentServiceTests : IDisposable
         var logDirectory = Path.Combine(_directory.Path, "logs");
         using (var logger = LoggingSetup.ConfigureFileLogging(logDirectory))
         {
-            var service = CreateService(GitExecutableLocator.ForCurrentEnvironment(), settingsFilePath: null, logger);
+            var service = CreateService(GitExecutableLocator.ForCurrentEnvironment(), logger: logger);
 
             await service.GetStatusAsync();
         }
@@ -134,23 +141,22 @@ public class GitEnvironmentServiceTests : IDisposable
 
     private GitEnvironmentService CreateService(
         GitExecutableLocator locator,
-        string? settingsFilePath,
+        IGitExecutablePathProvider? gitPathProvider = null,
         Serilog.ILogger? logger = null)
     {
-        // 用真实的设置读取器（读临时 settings.json）与真实的 git.exe，只有日志按需替换。
-        IGitExecutablePathProvider gitPathProvider = settingsFilePath is null
-            ? new NoGitExecutablePathProvider()
-            : new SettingsJsonGitPathProvider(settingsFilePath, logger ?? SilentLogger);
-
-        return new GitEnvironmentService(locator, new GitCliRunner(), gitPathProvider, logger ?? SilentLogger);
+        // 默认「设置里没配 git 路径」；需要手动路径的用例传入真实 SettingsService。
+        return new GitEnvironmentService(
+            locator,
+            new GitCliRunner(),
+            gitPathProvider ?? new NoGitExecutablePathProvider(),
+            logger ?? SilentLogger);
     }
 
-    private void WriteSettings(string gitExecutablePath)
-    {
-        // JSON 里用正斜杠，避免转义；Windows 路径按正斜杠同样可解析。
-        var json = $$"""{ "gitExecutablePath": "{{gitExecutablePath.Replace(@"\", "/")}}" }""";
-        File.WriteAllText(SettingsFilePath, json);
-    }
+    private SettingsService CreateSettingsService(Serilog.ILogger? logger = null)
+        => new(
+            SettingsFilePath,
+            Path.Combine(_directory.Path, "repository-state.json"),
+            logger ?? SilentLogger);
 
     private static readonly Serilog.ILogger SilentLogger = new Serilog.LoggerConfiguration().CreateLogger();
 

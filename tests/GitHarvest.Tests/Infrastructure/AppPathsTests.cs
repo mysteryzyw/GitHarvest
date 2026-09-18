@@ -33,6 +33,14 @@ public class AppPathsTests
             AppPaths.GetSettingsFilePath(RoamingRoot));
     }
 
+    [Fact]
+    public void 每仓库状态文件位于数据目录下()
+    {
+        Assert.Equal(
+            Path.Combine(RoamingRoot, "GitHarvest", "repository-state.json"),
+            AppPaths.GetRepositoryStateFilePath(RoamingRoot));
+    }
+
     [Theory]
     [InlineData(@"C:\Users\tester\AppData\Roaming\")]
     [InlineData(@"C:\Users\tester\AppData\Roaming\\")]

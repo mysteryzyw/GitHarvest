@@ -35,6 +35,10 @@ public partial class App : Application
 
         _services = BuildServices();
 
+        // 显式触发设置加载：首次启动时在此生成 %APPDATA%\GitHarvest\settings.json（含全部默认值），
+        // 不依赖 git 探测等后续链路的间接触发。
+        _ = _services.GetRequiredService<ISettingsService>();
+
         // 让 WpfUI 自身的控件也能从同一个容器解析依赖
         ControlsServices.Initialize(_services);
 
@@ -67,17 +71,19 @@ public partial class App : Application
     {
         var services = new ServiceCollection();
 
-        // 日志器：Core 里的服务（git 自检、设置读取）都注入这一个文件日志器
+        // 日志器：Core 里的服务（git 自检、设置读写）都注入这一个文件日志器
         services.AddSingleton<ILogger>(Log.Logger);
 
-        // Core 服务：导航目录 + git 访问基础设施（ticket 02）
+        // Core 服务：导航目录 + git 访问基础设施（ticket 02）+ 设置与 JSON 持久化（ticket 03）
         services.AddSingleton<INavigationCatalog, NavigationCatalog>();
         services.AddSingleton(provider => GitExecutableLocator.ForCurrentEnvironment());
         services.AddSingleton<GitCliRunner>();
-        services.AddSingleton(provider => new SettingsJsonGitPathProvider(
+        services.AddSingleton<ISettingsService>(provider => new SettingsService(
             AppPaths.GetSettingsFilePath(),
+            AppPaths.GetRepositoryStateFilePath(),
             provider.GetRequiredService<ILogger>()));
-        services.AddSingleton<IGitExecutablePathProvider>(provider => provider.GetRequiredService<SettingsJsonGitPathProvider>());
+        // git 探测只依赖「手动路径」窄接口，由设置服务同一单例充当；保存设置后复验无需改探测代码。
+        services.AddSingleton<IGitExecutablePathProvider>(provider => provider.GetRequiredService<ISettingsService>());
         services.AddSingleton<IGitEnvironmentService, GitEnvironmentService>();
 
         // 外壳与导航

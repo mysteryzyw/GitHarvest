@@ -15,6 +15,9 @@ public static class AppPaths
     /// <summary>全局设置文件名。</summary>
     public const string SettingsFileName = "settings.json";
 
+    /// <summary>每仓库状态文件名（上次输出路径/上次分支/最近仓库列表）。</summary>
+    public const string RepositoryStateFileName = "repository-state.json";
+
     /// <summary>数据目录：%APPDATA%\GitHarvest。</summary>
     public static string GetDataDirectory() => GetDataDirectory(ResolveRoamingAppDataDirectory());
 
@@ -28,6 +31,13 @@ public static class AppPaths
     /// <summary>在指定漫游应用数据根目录下解析全局设置文件。</summary>
     public static string GetSettingsFilePath(string roamingAppDataDirectory)
         => Path.Combine(GetDataDirectory(roamingAppDataDirectory), SettingsFileName);
+
+    /// <summary>每仓库状态文件：%APPDATA%\GitHarvest\repository-state.json。</summary>
+    public static string GetRepositoryStateFilePath() => GetRepositoryStateFilePath(ResolveRoamingAppDataDirectory());
+
+    /// <summary>在指定漫游应用数据根目录下解析每仓库状态文件。</summary>
+    public static string GetRepositoryStateFilePath(string roamingAppDataDirectory)
+        => Path.Combine(GetDataDirectory(roamingAppDataDirectory), RepositoryStateFileName);
 
     /// <summary>日志目录：%APPDATA%\GitHarvest\logs。</summary>
     public static string GetLogDirectory() => GetLogDirectory(ResolveRoamingAppDataDirectory());
