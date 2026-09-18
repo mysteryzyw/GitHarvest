@@ -1,0 +1,14 @@
+bin/
+obj/
+.vs/
+*.user
+*.suo
+TestResults/
+publish/
+
+# AI 协作产物（不入版本库）
+/.workbuddy/
+/.scratch/
+/docs/
+/AGENTS.md
+/CONTEXT.md

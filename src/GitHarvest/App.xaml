@@ -1,0 +1,20 @@
+﻿<Application
+    x:Class="GitHarvest.App"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:ui="http://schemas.lepo.co/wpfui/2022/xaml"
+    ShutdownMode="OnMainWindowClose">
+    <Application.Resources>
+        <ResourceDictionary>
+            <ResourceDictionary.MergedDictionaries>
+                <!-- WpfUI 的 Fluent 主题与控件样式（浅色为默认；主题切换在 ticket 12） -->
+                <ui:ThemesDictionary Theme="Light" />
+                <ui:ControlsDictionary />
+
+                <!-- 应用自有样式：强调色与排版令牌、卡片与按钮样式 -->
+                <ResourceDictionary Source="pack://application:,,,/GitHarvest;component/Themes/Tokens.xaml" />
+                <ResourceDictionary Source="pack://application:,,,/GitHarvest;component/Themes/Controls.xaml" />
+            </ResourceDictionary.MergedDictionaries>
+        </ResourceDictionary>
+    </Application.Resources>
+</Application>

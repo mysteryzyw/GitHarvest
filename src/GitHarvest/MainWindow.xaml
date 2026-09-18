@@ -1,0 +1,96 @@
+﻿<ui:FluentWindow
+    x:Class="GitHarvest.MainWindow"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:ui="http://schemas.lepo.co/wpfui/2022/xaml"
+    xmlns:views="clr-namespace:GitHarvest.Views"
+    Title="GitHarvest"
+    Width="1280"
+    Height="840"
+    MinWidth="1000"
+    MinHeight="640"
+    ExtendsContentIntoTitleBar="True"
+    WindowBackdropType="Mica"
+    WindowCornerPreference="Round"
+    WindowStartupLocation="CenterScreen">
+
+    <!--
+        应用外壳：标题栏在上，其下是左侧导航（四步工作流 + 全局设置 / 关于）与内容区。
+        导航项必须在 XAML 中声明：WpfUI 只在导航控件初始化时登记菜单项，
+        之后再添加的项不会被登记，左侧选中态就会与内容区不同步。
+        导航标题与 Core 的导航目录（NavigationCatalog）保持一致——后者是步骤指示条与页面标题的真相源，
+        页面类型与目的地的对应关系登记在 ShellPageRegistry。
+    -->
+
+    <Grid>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+        </Grid.RowDefinitions>
+
+        <ui:TitleBar Grid.Row="0" Title="GitHarvest">
+            <ui:TitleBar.Icon>
+                <ui:SymbolIcon Symbol="BranchFork24" />
+            </ui:TitleBar.Icon>
+        </ui:TitleBar>
+
+        <ui:NavigationView
+            x:Name="RootNavigation"
+            Grid.Row="1"
+            AlwaysShowHeader="False"
+            IsBackButtonVisible="Collapsed"
+            IsFooterSeparatorVisible="True"
+            IsPaneToggleVisible="False"
+            IsTopSeparatorVisible="False"
+            OpenPaneLength="248"
+            PaneDisplayMode="Left">
+
+            <ui:NavigationView.MenuItems>
+
+                <ui:NavigationViewItemHeader Text="工作流" />
+
+                <ui:NavigationViewItem Content="仓库" TargetPageType="{x:Type views:RepositoryPage}">
+                    <ui:NavigationViewItem.Icon>
+                        <ui:SymbolIcon Symbol="Home24" />
+                    </ui:NavigationViewItem.Icon>
+                </ui:NavigationViewItem>
+
+                <ui:NavigationViewItem Content="选择提交" TargetPageType="{x:Type views:PickCommitsPage}">
+                    <ui:NavigationViewItem.Icon>
+                        <ui:SymbolIcon Symbol="BranchFork24" />
+                    </ui:NavigationViewItem.Icon>
+                </ui:NavigationViewItem>
+
+                <ui:NavigationViewItem Content="导出前总预览" TargetPageType="{x:Type views:PreviewPage}">
+                    <ui:NavigationViewItem.Icon>
+                        <ui:SymbolIcon Symbol="Eye24" />
+                    </ui:NavigationViewItem.Icon>
+                </ui:NavigationViewItem>
+
+                <ui:NavigationViewItem Content="更新说明" TargetPageType="{x:Type views:NotesPage}">
+                    <ui:NavigationViewItem.Icon>
+                        <ui:SymbolIcon Symbol="DocumentText24" />
+                    </ui:NavigationViewItem.Icon>
+                </ui:NavigationViewItem>
+
+            </ui:NavigationView.MenuItems>
+
+            <ui:NavigationView.FooterMenuItems>
+
+                <ui:NavigationViewItem Content="全局设置" TargetPageType="{x:Type views:SettingsPage}">
+                    <ui:NavigationViewItem.Icon>
+                        <ui:SymbolIcon Symbol="Settings24" />
+                    </ui:NavigationViewItem.Icon>
+                </ui:NavigationViewItem>
+
+                <ui:NavigationViewItem Content="关于" TargetPageType="{x:Type views:AboutPage}">
+                    <ui:NavigationViewItem.Icon>
+                        <ui:SymbolIcon Symbol="Info24" />
+                    </ui:NavigationViewItem.Icon>
+                </ui:NavigationViewItem>
+
+            </ui:NavigationView.FooterMenuItems>
+
+        </ui:NavigationView>
+    </Grid>
+</ui:FluentWindow>

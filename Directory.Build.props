@@ -1,0 +1,11 @@
+<Project>
+
+  <!-- 全解决方案共享的编译约定。三个项目的目标框架各自在 csproj 中显式声明为 net9.0-windows。 -->
+  <PropertyGroup>
+    <LangVersion>latest</LangVersion>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <NeutralLanguage>zh-Hans</NeutralLanguage>
+  </PropertyGroup>
+
+</Project>

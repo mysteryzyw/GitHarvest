@@ -1,0 +1,74 @@
+<UserControl
+    x:Class="GitHarvest.Controls.StepBar"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+
+    <!--
+        步骤指示条：四步工作流的序号与标题，视觉对齐 docs/prototype/ui-fluent/。
+        数据来自 ShellViewModel.Steps（标题与顺序源自 Core 的导航目录）。
+    -->
+
+    <ItemsControl ItemsSource="{Binding Steps}">
+        <ItemsControl.ItemsPanel>
+            <ItemsPanelTemplate>
+                <StackPanel Orientation="Horizontal" />
+            </ItemsPanelTemplate>
+        </ItemsControl.ItemsPanel>
+
+        <ItemsControl.ItemTemplate>
+            <DataTemplate>
+                <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+
+                    <Border
+                        x:Name="Badge"
+                        Width="22"
+                        Height="22"
+                        Background="{DynamicResource ControlFillColorSecondaryBrush}"
+                        CornerRadius="11">
+                        <TextBlock
+                            x:Name="BadgeText"
+                            HorizontalAlignment="Center"
+                            VerticalAlignment="Center"
+                            FontSize="11.5"
+                            FontWeight="SemiBold"
+                            Foreground="{DynamicResource TextFillColorSecondaryBrush}"
+                            Text="{Binding Ordinal}" />
+                    </Border>
+
+                    <TextBlock
+                        x:Name="Label"
+                        Margin="9,0,0,0"
+                        VerticalAlignment="Center"
+                        FontSize="12.5"
+                        Foreground="{DynamicResource TextFillColorTertiaryBrush}"
+                        Text="{Binding Title}" />
+
+                    <Border
+                        Width="52"
+                        Height="1.5"
+                        Margin="12,0"
+                        VerticalAlignment="Center"
+                        Background="{DynamicResource ControlStrokeColorSecondaryBrush}" />
+
+                </StackPanel>
+
+                <DataTemplate.Triggers>
+                    <!-- 当前步骤：强调色实心徽章 + 实心标题 -->
+                    <DataTrigger Binding="{Binding State}" Value="Current">
+                        <Setter TargetName="Badge" Property="Background" Value="{StaticResource AppAccentBrush}" />
+                        <Setter TargetName="BadgeText" Property="Foreground" Value="{StaticResource AppOnAccentBrush}" />
+                        <Setter TargetName="Label" Property="FontWeight" Value="SemiBold" />
+                        <Setter TargetName="Label" Property="Foreground" Value="{DynamicResource TextFillColorPrimaryBrush}" />
+                    </DataTrigger>
+
+                    <!-- 已完成：绿色对勾徽章（对齐原型） -->
+                    <DataTrigger Binding="{Binding State}" Value="Done">
+                        <Setter TargetName="Badge" Property="Background" Value="{StaticResource AppSuccessBrush}" />
+                        <Setter TargetName="BadgeText" Property="Foreground" Value="{StaticResource AppOnAccentBrush}" />
+                        <Setter TargetName="BadgeText" Property="Text" Value="✓" />
+                    </DataTrigger>
+                </DataTemplate.Triggers>
+            </DataTemplate>
+        </ItemsControl.ItemTemplate>
+    </ItemsControl>
+</UserControl>

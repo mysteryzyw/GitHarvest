@@ -1,0 +1,17 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net9.0-windows</TargetFramework>
+    <RootNamespace>GitHarvest.Core</RootNamespace>
+    <!--
+      Core 必须保持零 WPF 依赖：不得设置 UseWPF，也不得引用 WindowsBase /
+      PresentationCore / PresentationFramework。Core 只承载与界面无关的行为。
+    -->
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Serilog" Version="4.2.0" />
+    <PackageReference Include="Serilog.Sinks.File" Version="7.0.0" />
+  </ItemGroup>
+
+</Project>
