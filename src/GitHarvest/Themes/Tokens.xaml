@@ -36,6 +36,15 @@
     <SolidColorBrush x:Key="AppDangerBorderBrush" Color="#40C42B1C" />
     <SolidColorBrush x:Key="AppDangerTextBrush" Color="#FF8C1D13" />
 
+    <!--
+        警告提示横幅：原型 :root 的 warn 与 warn-bg（.banner 只有 ok/err 两种，
+        warn 色取自类型徽章所在的同一套状态色；正文用更深的 #7F3D0E 保证浅黄底上的对比度）。
+    -->
+    <SolidColorBrush x:Key="AppWarnBrush" Color="#FFCA5010" />
+    <SolidColorBrush x:Key="AppWarnSoftBrush" Color="#FFFFF4CE" />
+    <SolidColorBrush x:Key="AppWarnBorderBrush" Color="#40CA5010" />
+    <SolidColorBrush x:Key="AppWarnTextBrush" Color="#FF7F3D0E" />
+
     <!-- ==================== 中性色 ==================== -->
     <SolidColorBrush x:Key="AppStrokeBrush" Color="#0F000000" />
     <SolidColorBrush x:Key="AppStrokeStrongBrush" Color="#72000000" />
@@ -43,8 +52,19 @@
     <SolidColorBrush x:Key="AppSurfaceMutedBrush" Color="#1F000000" />
 
     <!-- ==================== 卡片（原型 .card） ==================== -->
-    <!-- 原型卡片底色：rgba(253,253,253,.78) -->
-    <SolidColorBrush x:Key="AppCardBackgroundBrush" Color="#C7FDFDFD" />
+    <!--
+        原型卡片底色是 rgba(253,253,253,.78)，叠在页面底（243）上合成约 #FBFBFB。
+        WPF 里不能照抄这个半透明值：卡片的 DropShadowEffect 画在元素背后，
+        半透明卡面会把自家投影透出来，把卡面压暗约 5 级（实机采样 246 vs 原型 251，
+        即 0.78×253 + 0.22×(9% 黑影叠在 244 上的 222) = 246）。
+        因此这里直接给等效的不透明合成色，卡面亮度与原型一致，投影也回到只出现在卡片外。
+    -->
+    <SolidColorBrush x:Key="AppCardBackgroundBrush" Color="#FFFBFBFB" />
+    <!--
+        嵌套在卡片里的卡（概览统计小卡、后续页面的分块）：原型是「卡底再叠一层 78% 白」≈ 253，
+        所以比基卡再亮两级，两者靠 1px 描边区分（与原型观感一致）。
+    -->
+    <SolidColorBrush x:Key="AppRaisedCardBackgroundBrush" Color="#FFFDFDFD" />
     <!-- 原型 .card 的 card-border: rgba(0,0,0,.0578) -->
     <SolidColorBrush x:Key="AppCardBorderBrush" Color="#0F000000" />
     <!--
@@ -59,9 +79,22 @@
         Opacity="0.09"
         ShadowDepth="1.5" />
 
+    <!--
+        原型 .card.hoverable:hover 的 card-shadow-hover: 0 8px 16px rgba(0,0,0,.08), 0 0 2px rgba(0,0,0,.06)。
+        比常态卡片投影更大更柔，用于最近仓库卡片等可悬浮卡片的悬停态。
+        （Opacity 取两层叠加后的等效强度：太弱会在实机上完全看不见。）
+    -->
+    <DropShadowEffect
+        x:Key="AppCardHoverShadowEffect"
+        BlurRadius="16"
+        Color="#FF000000"
+        Direction="270"
+        Opacity="0.15"
+        ShadowDepth="5" />
+
     <!-- ==================== 浮起操作条（原型 .range-bar） ==================== -->
-    <!-- 原型 background: rgba(252,252,252,.92) -->
-    <SolidColorBrush x:Key="AppBarBackgroundBrush" Color="#EBFCFCFC" />
+    <!-- 原型 background: rgba(252,252,252,.92)：同样给等效不透明色（半透明会让自身投影透上来压暗条面） -->
+    <SolidColorBrush x:Key="AppBarBackgroundBrush" Color="#FFFCFCFC" />
     <!-- 原型 box-shadow: 0 8px 24px rgba(0,0,0,.10) -->
     <DropShadowEffect
         x:Key="AppBarShadowEffect"

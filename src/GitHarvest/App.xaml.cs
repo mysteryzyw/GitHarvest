@@ -3,6 +3,7 @@ using System.Windows;
 using System.Windows.Media;
 using GitHarvest.Core.Git;
 using GitHarvest.Core.Infrastructure;
+using GitHarvest.Core.Interaction;
 using GitHarvest.Core.Navigation;
 using GitHarvest.Core.Settings;
 using GitHarvest.Shell;
@@ -75,6 +76,7 @@ public partial class App : Application
         services.AddSingleton<ILogger>(Log.Logger);
 
         // Core 服务：导航目录 + git 访问基础设施（ticket 02）+ 设置与 JSON 持久化（ticket 03）
+        // + 仓库级 Git 操作（ticket 04）
         services.AddSingleton<INavigationCatalog, NavigationCatalog>();
         services.AddSingleton(provider => GitExecutableLocator.ForCurrentEnvironment());
         services.AddSingleton<GitCliRunner>();
@@ -85,6 +87,10 @@ public partial class App : Application
         // git 探测只依赖「手动路径」窄接口，由设置服务同一单例充当；保存设置后复验无需改探测代码。
         services.AddSingleton<IGitExecutablePathProvider>(provider => provider.GetRequiredService<ISettingsService>());
         services.AddSingleton<IGitEnvironmentService, GitEnvironmentService>();
+        services.AddSingleton<IGitService, GitService>();
+
+        // 壳向 ViewModel 提供的交互接缝：文件夹选择对话框（接口定义在 Core，见 IFolderPicker）
+        services.AddSingleton<IFolderPicker, FolderPicker>();
 
         // 外壳与导航
         services.AddSingleton<ShellViewModel>();

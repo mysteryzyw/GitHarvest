@@ -2,26 +2,32 @@
     x:Class="GitHarvest.Views.RepositoryPage"
     xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:controls="clr-namespace:GitHarvest.Controls"
     xmlns:ui="http://schemas.lepo.co/wpfui/2022/xaml">
 
     <!--
-        仓库页（工作流第 1 步）。原型里这一页是「欢迎 / 打开仓库」的首屏，既不带步骤指示条也不带底部操作条
-        （首屏靠 hero 区与最近仓库卡片前进，ticket 04 落地），本页对齐这一点。
-        本 ticket 只加一件事：git 环境自检失败时的引导横幅（含直接去设置页的入口），
-        探测成功时横幅收起——首页不需要为正常状态加任何东西。
+        仓库页（工作流第 1 步）——「打开仓库与首页」。视觉对齐原型页 0：
+        hero 区（打开入口 + 概览统计）、错误 / 警告横幅、最近打开的仓库卡片列表。
+        git 环境自检的引导横幅（ticket 02）保留在最上方。
     -->
+
+    <Page.Resources>
+        <BooleanToVisibilityConverter x:Key="BoolToVisibility" />
+    </Page.Resources>
 
     <ScrollViewer HorizontalScrollBarVisibility="Disabled" VerticalScrollBarVisibility="Auto">
         <StackPanel Style="{StaticResource PageLayout}">
 
             <TextBlock Style="{StaticResource PageTitleText}" Text="{Binding Shell.CurrentTitle}" />
-            <TextBlock Style="{StaticResource PageSubtitleText}" Text="选定两次提交，导出变更文件快照与更新说明，一键生成交付给客户的更新包。" />
+            <TextBlock
+                Style="{StaticResource PageSubtitleText}"
+                Text="选定两次提交，导出变更文件快照与更新说明，一键生成交付给客户的更新包。" />
 
+            <!-- git 环境自检失败时的引导横幅（探测成功时收起，见 ticket 02） -->
             <Border Margin="0,20,0,0">
                 <Border.Style>
                     <Style BasedOn="{StaticResource AppErrorBanner}" TargetType="Border">
                         <Style.Triggers>
-                            <!-- 探测完成且 git 不可用时才出现；未探测完（GitStatus 为空）也不闪一下 -->
                             <DataTrigger Binding="{Binding IsGitUnavailable}" Value="False">
                                 <Setter Property="Visibility" Value="Collapsed" />
                             </DataTrigger>
@@ -67,15 +73,561 @@
                 </Grid>
             </Border>
 
-            <Border Margin="0,20,0,0" Style="{StaticResource AppCard}">
-                <StackPanel>
-                    <TextBlock Style="{StaticResource SectionHeaderText}" Text="骨架占位" />
+            <!-- 打开失败的错误横幅（不是 Git 仓库 / 目录不存在 / Git 错误 / Git 未就绪） -->
+            <Border Margin="0,12,0,0">
+                <Border.Style>
+                    <Style BasedOn="{StaticResource AppErrorBanner}" TargetType="Border">
+                        <Style.Triggers>
+                            <DataTrigger Binding="{Binding ErrorMessage}" Value="{x:Null}">
+                                <Setter Property="Visibility" Value="Collapsed" />
+                            </DataTrigger>
+                        </Style.Triggers>
+                    </Style>
+                </Border.Style>
+
+                <Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="Auto" />
+                        <ColumnDefinition Width="*" />
+                    </Grid.ColumnDefinitions>
+
+                    <ui:SymbolIcon
+                        Grid.Column="0"
+                        Margin="0,0,10,0"
+                        VerticalAlignment="Center"
+                        FontSize="16"
+                        Foreground="{StaticResource AppDangerBrush}"
+                        Symbol="ErrorCircle24" />
+
                     <TextBlock
-                        Margin="0,6,0,0"
-                        Style="{StaticResource HintText}"
-                        Text="本页尚无业务功能。计划落地内容：文件夹选择器打开本地仓库、非仓库目录与提交数不足的明确提示、最近打开的 10 个仓库列表与首次启动引导（ticket 04）。" />
-                </StackPanel>
+                        Grid.Column="1"
+                        Style="{StaticResource AppBannerText}"
+                        Text="{Binding ErrorMessage}" />
+                </Grid>
             </Border>
+
+            <!-- ============ hero 区：打开入口 + 概览 ============ -->
+            <!--
+                原型 .hero 是 flex、gap 22、两卡 flex 1.4 / 1（margin-top 22）：
+                先扣除 22 间隙，再把剩余宽按 1.4:1 分。
+                WPF 星号列分的是含间隙在内的总宽，若仍用两列 + 右卡 Margin，间隙会被按比例吃进两卡
+                （左卡变宽、右卡变窄），因此间隙单独成固定宽的中列，星号列自然就只分剩余宽。
+            -->
+            <Grid Margin="0,22,0,0">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="14*" />
+                    <ColumnDefinition Width="22" />
+                    <ColumnDefinition Width="10*" />
+                </Grid.ColumnDefinitions>
+
+                <!-- 左：打开仓库主卡（原型 .hero-main：上下 26 左右 28 内边距） -->
+                <Border Grid.Column="0" Grid.Row="0">
+                    <Border.Style>
+                        <Style BasedOn="{StaticResource AppCard}" TargetType="Border">
+                            <Setter Property="Padding" Value="28,26" />
+                        </Style>
+                    </Border.Style>
+                    <StackPanel>
+
+                        <TextBlock
+                            FontSize="19"
+                            FontWeight="SemiBold"
+                            Foreground="{DynamicResource TextFillColorPrimaryBrush}"
+                            Text="打开本地 Git 仓库" />
+
+                        <!-- 未打开：拖放区 + 路径输入行 -->
+                        <StackPanel>
+                            <StackPanel.Style>
+                                <Style TargetType="StackPanel">
+                                    <Style.Triggers>
+                                        <DataTrigger Binding="{Binding IsRepositoryOpen}" Value="True">
+                                            <Setter Property="Visibility" Value="Collapsed" />
+                                        </DataTrigger>
+                                    </Style.Triggers>
+                                </Style>
+                            </StackPanel.Style>
+
+                            <!-- 点击整块弹出文件夹选择对话框，选完即尝试打开；也接受把仓库文件夹拖进来 -->
+                            <Border
+                                Margin="0,14,0,0"
+                                AllowDrop="True"
+                                DragOver="OnDropZoneDragOver"
+                                Drop="OnDropZoneDrop">
+                                <Border.Style>
+                                    <Style BasedOn="{StaticResource AppDropZone}" TargetType="Border" />
+                                </Border.Style>
+                                <Border.InputBindings>
+                                    <MouseBinding
+                                        Command="{Binding BrowseFolderCommand}"
+                                        Gesture="LeftClick" />
+                                </Border.InputBindings>
+
+                                <!--
+                                    内边距给内容 StackPanel（原型 .drop-zone 的 padding:26px），
+                                    虚线 Rectangle 横跨整个 Border、贴着蓝色区域边缘画；
+                                    若内边距设在 Border 上，虚线框会被挤到内边距内侧、紧贴文字。
+                                -->
+                                <Grid>
+                                    <Rectangle Style="{StaticResource AppDropZoneOutline}" />
+                                    <StackPanel
+                                        Margin="26"
+                                        HorizontalAlignment="Center"
+                                        Orientation="Vertical">
+                                        <ui:SymbolIcon
+                                            HorizontalAlignment="Center"
+                                            FontSize="34"
+                                            Foreground="{StaticResource AppAccentBrush}"
+                                            Symbol="Folder24" />
+                                        <!-- 原型 drop-zone 主文案继承 body 的 14px、600 字重 -->
+                                        <TextBlock
+                                            Margin="0,10,0,0"
+                                            HorizontalAlignment="Center"
+                                            FontSize="14"
+                                            FontWeight="SemiBold"
+                                            Foreground="{StaticResource AppAccentBrush}"
+                                            Text="点击浏览 或 将仓库文件夹拖到此处" />
+                                        <TextBlock
+                                            Margin="0,10,0,0"
+                                            HorizontalAlignment="Center"
+                                            FontSize="12"
+                                            Foreground="{StaticResource AppAccentBrush}"
+                                            Opacity="0.8"
+                                            Text="支持包含 .git 目录的任意本地仓库" />
+                                    </StackPanel>
+                                </Grid>
+                            </Border>
+
+                            <Grid Margin="0,14,0,0">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+
+                                <!-- 原型 .textbox input 字号 13px（与「打开」按钮同级），非 WpfUI 默认的 14 -->
+                                <ui:TextBox
+                                    Grid.Column="0"
+                                    Height="32"
+                                    FontSize="13"
+                                    VerticalContentAlignment="Center"
+                                    PlaceholderText="粘贴仓库路径，如 D:\Projects\MyRepo"
+                                    Text="{Binding ManualPath, UpdateSourceTrigger=PropertyChanged}">
+                                    <!--
+                                        原型 .textbox 的搜索图标（14px、三级色）。
+                                        TextBox.Icon 是 IconElement 类型，必须用元素语法给 SymbolIcon；
+                                        写成 Icon="Search24" 字符串不会渲染出图标。
+                                    -->
+                                    <ui:TextBox.Icon>
+                                        <ui:SymbolIcon
+                                            FontSize="14"
+                                            Foreground="{DynamicResource TextFillColorTertiaryBrush}"
+                                            Symbol="Search24" />
+                                    </ui:TextBox.Icon>
+                                    <ui:TextBox.InputBindings>
+                                        <!-- 路径栏里直接回车 = 点「打开」 -->
+                                        <KeyBinding
+                                            Command="{Binding OpenRepositoryCommand}"
+                                            CommandParameter="{Binding ManualPath}"
+                                            Key="Enter" />
+                                    </ui:TextBox.InputBindings>
+                                </ui:TextBox>
+
+                                <ui:Button
+                                    Grid.Column="1"
+                                    Height="32"
+                                    Margin="8,0,0,0"
+                                    Command="{Binding OpenRepositoryCommand}"
+                                    CommandParameter="{Binding ManualPath}"
+                                    Content="打开"
+                                    Style="{StaticResource AppPrimaryButton}" />
+                            </Grid>
+                        </StackPanel>
+
+                        <!-- 已打开：仓库状态（路径 / 分支 / bare 标记 / 提交数） -->
+                        <StackPanel>
+                            <StackPanel.Style>
+                                <Style TargetType="StackPanel">
+                                    <Style.Triggers>
+                                        <DataTrigger Binding="{Binding IsRepositoryOpen}" Value="False">
+                                            <Setter Property="Visibility" Value="Collapsed" />
+                                        </DataTrigger>
+                                    </Style.Triggers>
+                                </Style>
+                            </StackPanel.Style>
+
+                            <StackPanel Margin="0,14,0,0" Orientation="Horizontal">
+                                <ui:SymbolIcon
+                                    FontSize="20"
+                                    Foreground="{StaticResource AppSuccessBrush}"
+                                    Symbol="CheckmarkCircle24" />
+                                <TextBlock
+                                    Margin="8,0,0,0"
+                                    VerticalAlignment="Center"
+                                    FontSize="14.5"
+                                    FontWeight="SemiBold"
+                                    Foreground="{DynamicResource TextFillColorPrimaryBrush}"
+                                    Text="仓库已打开" />
+                            </StackPanel>
+
+                            <TextBlock
+                                Margin="0,10,0,0"
+                                Style="{StaticResource MonospaceText}"
+                                Text="{Binding OpenedRepository.RootPath}"
+                                TextTrimming="CharacterEllipsis" />
+
+                            <StackPanel Margin="0,10,0,0" Orientation="Horizontal">
+                                <Border Style="{StaticResource AppMonoChip}">
+                                    <StackPanel Orientation="Horizontal">
+                                        <ui:SymbolIcon
+                                            FontSize="13"
+                                            Foreground="{StaticResource AppAccentBrush}"
+                                            Symbol="Branch24" />
+                                        <TextBlock
+                                            Margin="4,0,0,0"
+                                            Style="{StaticResource AppMonoChipText}"
+                                            Text="{Binding CurrentBranchDisplay}" />
+                                    </StackPanel>
+                                </Border>
+
+                                <!-- bare 仓库没有工作区，显式标注提醒导出结果只来自提交数据 -->
+                                <Border Margin="8,0,0,0">
+                                    <Border.Style>
+                                        <Style BasedOn="{StaticResource AppMonoChip}" TargetType="Border">
+                                            <Style.Triggers>
+                                                <DataTrigger Binding="{Binding OpenedRepository.IsBare}" Value="False">
+                                                    <Setter Property="Visibility" Value="Collapsed" />
+                                                </DataTrigger>
+                                            </Style.Triggers>
+                                        </Style>
+                                    </Border.Style>
+                                    <TextBlock Style="{StaticResource AppMonoChipText}" Text="bare 仓库（无工作区）" />
+                                </Border>
+
+                                <TextBlock
+                                    Margin="10,0,0,0"
+                                    VerticalAlignment="Center"
+                                    Style="{StaticResource HintText}"
+                                    Text="{Binding CommitCountDisplay, StringFormat=提交数 {0}}" />
+                            </StackPanel>
+
+                            <!-- 提交数不足的警告（打开成功但无法构成变更范围） -->
+                            <Border Margin="0,14,0,0">
+                                <Border.Style>
+                                    <Style BasedOn="{StaticResource AppWarningBanner}" TargetType="Border">
+                                        <Style.Triggers>
+                                            <DataTrigger Binding="{Binding WarningMessage}" Value="{x:Null}">
+                                                <Setter Property="Visibility" Value="Collapsed" />
+                                            </DataTrigger>
+                                        </Style.Triggers>
+                                    </Style>
+                                </Border.Style>
+
+                                <!-- 用 Grid 给文字列 * 宽度约束：水平 StackPanel 不给子元素宽约束，长文案不换行会被裁掉 -->
+                                <Grid>
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="Auto" />
+                                        <ColumnDefinition Width="*" />
+                                    </Grid.ColumnDefinitions>
+
+                                    <ui:SymbolIcon
+                                        Grid.Column="0"
+                                        FontSize="16"
+                                        Foreground="{StaticResource AppWarnBrush}"
+                                        Symbol="Warning24" />
+                                    <TextBlock
+                                        Grid.Column="1"
+                                        Margin="10,0,0,0"
+                                        Style="{StaticResource AppWarningText}"
+                                        Text="{Binding WarningMessage}" />
+                                </Grid>
+                            </Border>
+
+                            <StackPanel Margin="0,14,0,0" Orientation="Horizontal">
+                                <ui:Button
+                                    Command="{Binding GoToPickCommitsCommand}"
+                                    Content="下一步：选择提交 →"
+                                    Style="{StaticResource AppPrimaryButton}" />
+                                <ui:Button
+                                    Margin="8,0,0,0"
+                                    Command="{Binding BrowseFolderCommand}"
+                                    Content="打开其他仓库"
+                                    Style="{StaticResource AppSecondaryButton}" />
+                            </StackPanel>
+                        </StackPanel>
+
+                    </StackPanel>
+                </Border>
+
+                <!-- 右：概览统计（历史更新包与最常用分支在 ticket 11 接真实数据；原型 .hero-side：上下 20 左右 22 内边距） -->
+                <Border Grid.Column="2" Grid.Row="0">
+                    <Border.Style>
+                        <Style BasedOn="{StaticResource AppCard}" TargetType="Border">
+                            <Setter Property="Padding" Value="22,20" />
+                        </Style>
+                    </Border.Style>
+                    <StackPanel>
+                        <TextBlock
+                            FontSize="14"
+                            FontWeight="SemiBold"
+                            Foreground="{DynamicResource TextFillColorSecondaryBrush}"
+                            Text="概览" />
+
+                        <Grid Margin="0,10,0,0">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <!-- 列间隙与 hero 同理单独成列，星号列只分剩余宽（原型 .stat-mini gap:14） -->
+                                <ColumnDefinition Width="14" />
+                                <ColumnDefinition Width="*" />
+                            </Grid.ColumnDefinitions>
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="Auto" />
+                                <RowDefinition Height="Auto" />
+                            </Grid.RowDefinitions>
+                            <Grid.Resources>
+                                <!-- 原型 .stat-mini .card：上下 14 左右 16 内边距；嵌套卡比外层卡面亮两级 -->
+                                <Style x:Key="StatCard" BasedOn="{StaticResource AppCard}" TargetType="Border">
+                                    <Setter Property="Padding" Value="16,14" />
+                                    <Setter Property="Background" Value="{StaticResource AppRaisedCardBackgroundBrush}" />
+                                </Style>
+                                <Style x:Key="StatNumber" TargetType="TextBlock">
+                                    <Setter Property="FontFamily" Value="{StaticResource AppFontFamily}" />
+                                    <Setter Property="FontSize" Value="22" />
+                                    <Setter Property="FontWeight" Value="SemiBold" />
+                                    <Setter Property="Foreground" Value="{DynamicResource TextFillColorPrimaryBrush}" />
+                                </Style>
+                                <Style x:Key="StatLabel" TargetType="TextBlock">
+                                    <Setter Property="FontFamily" Value="{StaticResource AppFontFamily}" />
+                                    <Setter Property="FontSize" Value="12" />
+                                    <Setter Property="Margin" Value="0,2,0,0" />
+                                    <Setter Property="Foreground" Value="{DynamicResource TextFillColorSecondaryBrush}" />
+                                </Style>
+                            </Grid.Resources>
+
+                            <Border Grid.Column="0" Grid.Row="0" Style="{StaticResource StatCard}">
+                                <StackPanel>
+                                    <TextBlock Style="{StaticResource StatNumber}" Text="{Binding RecentCountDisplay}" />
+                                    <TextBlock Style="{StaticResource StatLabel}" Text="最近仓库" />
+                                </StackPanel>
+                            </Border>
+
+                            <Border Grid.Column="2" Grid.Row="0" Style="{StaticResource StatCard}">
+                                <StackPanel>
+                                    <TextBlock Style="{StaticResource StatNumber}" Text="—" ToolTip="导出历史在后续版本提供" />
+                                    <TextBlock Style="{StaticResource StatLabel}" Text="历史更新包" />
+                                </StackPanel>
+                            </Border>
+
+                            <Border Grid.Column="0" Grid.Row="1" Margin="0,10,0,0" Style="{StaticResource StatCard}">
+                                <StackPanel>
+                                    <TextBlock Style="{StaticResource StatNumber}" Text="—" ToolTip="导出历史在后续版本提供" />
+                                    <TextBlock Style="{StaticResource StatLabel}" Text="最常用分支" />
+                                </StackPanel>
+                            </Border>
+
+                            <Border Grid.Column="2" Grid.Row="1" Margin="0,10,0,0" Style="{StaticResource StatCard}">
+                                <StackPanel>
+                                    <!-- 原型四张统计卡的数字同为 22px，路径超长时省略号截断 -->
+                                    <TextBlock
+                                        Style="{StaticResource StatNumber}"
+                                        Text="{Binding DefaultOutputPathDisplay}"
+                                        TextTrimming="CharacterEllipsis"
+                                        ToolTip="{Binding DefaultOutputPathDisplay}" />
+                                    <TextBlock Style="{StaticResource StatLabel}" Text="默认输出根目录" />
+                                </StackPanel>
+                            </Border>
+                        </Grid>
+
+                        <!-- 原型页 0 的说明文字：12px、三级色、line-height 1.6（≈19px）、上间距 10(gap)+2(margin) -->
+                        <TextBlock
+                            Margin="0,12,0,0"
+                            FontSize="12"
+                            Foreground="{DynamicResource TextFillColorTertiaryBrush}"
+                            LineHeight="19"
+                            TextWrapping="Wrap"
+                            Text="每个仓库会记住上次使用的分支与输出路径，下次打开自动恢复。" />
+                    </StackPanel>
+                </Border>
+            </Grid>
+
+            <!-- ============ 最近打开的仓库 ============ -->
+            <TextBlock
+                Margin="0,20,0,4"
+                FontSize="13"
+                FontWeight="SemiBold"
+                Foreground="{DynamicResource TextFillColorSecondaryBrush}"
+                Text="最近打开" />
+
+            <TextBlock
+                Text="尚未打开过仓库。从上方选择文件夹开始，打开成功的仓库会出现在这里，方便下次一键重开。">
+                <TextBlock.Style>
+                    <Style BasedOn="{StaticResource HintText}" TargetType="TextBlock">
+                        <!-- 首次启动（列表为空）显示引导文案，有记录后让位给仓库卡片 -->
+                        <Setter Property="Visibility" Value="Collapsed" />
+                        <Style.Triggers>
+                            <DataTrigger Binding="{Binding RecentRepositories.Count}" Value="0">
+                                <Setter Property="Visibility" Value="Visible" />
+                            </DataTrigger>
+                        </Style.Triggers>
+                    </Style>
+                </TextBlock.Style>
+            </TextBlock>
+
+            <!--
+                原型此处是「标题 margin-bottom 4 + 列表 margin-top 22」经 CSS margin 折叠后间距 22px；
+                WPF 无折叠，标题保留原型结构（20/4），列表补 18 使合计 22。
+            -->
+            <ItemsControl Margin="0,18,0,0" ItemsSource="{Binding RecentRepositories}">
+                <!--
+                    原型 .repo-list 是多列自适应网格（repeat(auto-fill, minmax(330px,1fr))，gap 14）：
+                    列数随宽度自适应、列宽均分贴齐容器边缘。WrapPanel 表达不了这种语义
+                    （最后一列的间距 margin 也占槽位，卡片会被裁窄且右缘对不齐），
+                    用壳侧的 AutoFillPanel 复刻 CSS auto-fill（详见该类的注释）。
+                    卡片自身的宽与外边距全部交给面板统一排布。
+                -->
+                <ItemsControl.ItemsPanel>
+                    <ItemsPanelTemplate>
+                        <controls:AutoFillPanel Gap="14" MinItemWidth="330" />
+                    </ItemsPanelTemplate>
+                </ItemsControl.ItemsPanel>
+                <ItemsControl.ItemTemplate>
+                    <DataTemplate>
+                        <Border Style="{StaticResource AppRecentRepoCard}">
+                            <Border.InputBindings>
+                                <!-- 点卡片任意处即重开该仓库 -->
+                                <MouseBinding
+                                    Command="{Binding DataContext.OpenRepositoryCommand, RelativeSource={RelativeSource AncestorType=ItemsControl}}"
+                                    CommandParameter="{Binding FullPath}"
+                                    Gesture="LeftClick" />
+                            </Border.InputBindings>
+
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="Auto" />
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+
+                                <!-- 图标底色按列表序号轮换蓝 / 紫 / 绿（原型三张示例卡的配色） -->
+                                <Border
+                                    Grid.Column="0"
+                                    Width="42"
+                                    Height="42"
+                                    CornerRadius="8">
+                                    <Border.Style>
+                                        <Style TargetType="Border">
+                                            <Setter Property="Background" Value="{StaticResource AppRepoIconBackgroundBrush}" />
+                                            <Style.Triggers>
+                                                <DataTrigger Binding="{Binding ColorSlot}" Value="1">
+                                                    <Setter Property="Background" Value="{StaticResource AppRepoIconPurpleBackgroundBrush}" />
+                                                </DataTrigger>
+                                                <DataTrigger Binding="{Binding ColorSlot}" Value="2">
+                                                    <Setter Property="Background" Value="{StaticResource AppRepoIconGreenBackgroundBrush}" />
+                                                </DataTrigger>
+                                            </Style.Triggers>
+                                        </Style>
+                                    </Border.Style>
+                                    <ui:SymbolIcon
+                                        FontSize="20"
+                                        Foreground="{StaticResource AppOnAccentBrush}"
+                                        Symbol="Branch24" />
+                                </Border>
+
+                                <StackPanel
+                                    Grid.Column="1"
+                                    Margin="14,0,0,0"
+                                    VerticalAlignment="Center">
+                                    <TextBlock
+                                        FontSize="14.5"
+                                        FontWeight="SemiBold"
+                                        Foreground="{DynamicResource TextFillColorPrimaryBrush}"
+                                        Text="{Binding DisplayName}"
+                                        TextTrimming="CharacterEllipsis" />
+                                    <TextBlock
+                                        Margin="0,3,0,0"
+                                        FontFamily="{StaticResource AppMonospaceFontFamily}"
+                                        FontSize="11.5"
+                                        Foreground="{DynamicResource TextFillColorTertiaryBrush}"
+                                        Text="{Binding FullPath}"
+                                        TextTrimming="CharacterEllipsis" />
+
+                                    <!--
+                                        原型 meta 行：上次选中分支的等宽 chip（未记录过不显示）+ 上次导出时间。
+                                        导出历史在 ticket 11 接入，当前尚未有过导出，恒显示「从未导出」。
+                                    -->
+                                    <StackPanel
+                                        Margin="0,9,0,0"
+                                        Orientation="Horizontal">
+                                        <Border Margin="0,0,8,0">
+                                            <Border.Style>
+                                                <Style BasedOn="{StaticResource AppMonoChip}" TargetType="Border">
+                                                    <Style.Triggers>
+                                                        <DataTrigger Binding="{Binding LastBranch}" Value="">
+                                                            <Setter Property="Visibility" Value="Collapsed" />
+                                                        </DataTrigger>
+                                                        <DataTrigger Binding="{Binding LastBranch}" Value="{x:Null}">
+                                                            <Setter Property="Visibility" Value="Collapsed" />
+                                                        </DataTrigger>
+                                                    </Style.Triggers>
+                                                </Style>
+                                            </Border.Style>
+                                            <!-- 原型首页的分支 chip 是纯文字徽章（.chip 基类 12px），不带图标 -->
+                                            <TextBlock
+                                                Style="{StaticResource AppMonoChipText}"
+                                                Text="{Binding LastBranch}" />
+                                        </Border>
+                                        <TextBlock
+                                            VerticalAlignment="Center"
+                                            FontSize="11.5"
+                                            Foreground="{DynamicResource TextFillColorTertiaryBrush}"
+                                            Text="从未导出"
+                                            ToolTip="导出历史在后续版本提供" />
+                                    </StackPanel>
+                                </StackPanel>
+
+                                <!-- 原型 .btn.subtle.go：透明无边框、仅悬停时以 0.15s 过渡淡入 -->
+                                <ui:Button
+                                    Grid.Column="2"
+                                    Margin="14,0,0,0"
+                                    VerticalAlignment="Center"
+                                    Command="{Binding DataContext.OpenRepositoryCommand, RelativeSource={RelativeSource AncestorType=ItemsControl}}"
+                                    CommandParameter="{Binding FullPath}"
+                                    Content="打开 →">
+                                    <ui:Button.Style>
+                                        <Style BasedOn="{StaticResource AppSubtleButton}" TargetType="{x:Type ui:Button}">
+                                            <Setter Property="Opacity" Value="0" />
+                                            <Style.Triggers>
+                                                <DataTrigger
+                                                    Binding="{Binding IsMouseOver, RelativeSource={RelativeSource AncestorType=Border}}"
+                                                    Value="True">
+                                                    <DataTrigger.EnterActions>
+                                                        <BeginStoryboard>
+                                                            <Storyboard>
+                                                                <DoubleAnimation
+                                                                    Storyboard.TargetProperty="Opacity"
+                                                                    To="1"
+                                                                    Duration="0:0:0.15" />
+                                                            </Storyboard>
+                                                        </BeginStoryboard>
+                                                    </DataTrigger.EnterActions>
+                                                    <DataTrigger.ExitActions>
+                                                        <BeginStoryboard>
+                                                            <Storyboard>
+                                                                <DoubleAnimation
+                                                                    Storyboard.TargetProperty="Opacity"
+                                                                    To="0"
+                                                                    Duration="0:0:0.15" />
+                                                            </Storyboard>
+                                                        </BeginStoryboard>
+                                                    </DataTrigger.ExitActions>
+                                                </DataTrigger>
+                                            </Style.Triggers>
+                                        </Style>
+                                    </ui:Button.Style>
+                                </ui:Button>
+                            </Grid>
+                        </Border>
+                    </DataTemplate>
+                </ItemsControl.ItemTemplate>
+            </ItemsControl>
 
         </StackPanel>
     </ScrollViewer>

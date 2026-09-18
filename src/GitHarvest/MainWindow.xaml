@@ -10,6 +10,8 @@
     MinWidth="1000"
     MinHeight="640"
     ExtendsContentIntoTitleBar="True"
+    TextOptions.TextFormattingMode="Display"
+    UseLayoutRounding="True"
     WindowBackdropType="Mica"
     WindowCornerPreference="Round"
     WindowStartupLocation="CenterScreen">
@@ -22,6 +24,12 @@
         页面类型与目的地的对应关系登记在 ShellPageRegistry。
         导航项的 Tag 是原型里 1–4 的步骤序号，只用于显示，不参与任何导航语义。
         根容器的底色是原型 .window 的 86% 灰（盖住 Mica 透出的壁纸色），标题栏与内容区共享这层底。
+
+        窗口根上的两处渲染设置：
+        - UseLayoutRounding：把布局位置吸附到整像素，边框与分隔线不会落在半像素上被抗锯齿糊掉。
+        - TextOptions.TextFormattingMode="Display"：WPF 默认的 Ideal 模式按排版度量摆放字形，
+          在 125% / 150% 缩放的实机上文字发虚；Display 模式把字形与步进吸附整像素，界面文字明显更锐利
+          （该附加属性沿视觉树继承，设一次即覆盖整个窗口）。
     -->
 
     <Grid Background="{StaticResource AppWindowBackgroundBrush}">

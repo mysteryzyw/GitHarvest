@@ -111,6 +111,45 @@
         <Setter Property="Appearance" Value="Secondary" />
     </Style>
 
+    <!--
+        幽灵按钮（原型 .btn.subtle：透明无边框、文字次级色；悬停 5% 黑底 + 文字转主色，按下再深一层）。
+        WpfUI 的 Appearance="Transparent" 在悬停时仍会画出白底 + 描边的按钮盒，与原型不符，
+        因此这里换成自写模板——模板只认 Background/Foreground，不受 WpfUI 外观画刷影响。
+        Focusable=False：该按钮与整卡点击完全等价，且平时不可见（悬停才浮出），不参与键盘导航。
+    -->
+    <Style
+        x:Key="AppSubtleButton"
+        BasedOn="{StaticResource AppButtonBase}"
+        TargetType="{x:Type ui:Button}">
+        <Setter Property="Focusable" Value="False" />
+        <Setter Property="Foreground" Value="{DynamicResource TextFillColorSecondaryBrush}" />
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="{x:Type ui:Button}">
+                    <Border
+                        x:Name="Chrome"
+                        Background="Transparent"
+                        CornerRadius="{TemplateBinding CornerRadius}"
+                        Padding="{TemplateBinding Padding}">
+                        <ContentPresenter
+                            HorizontalAlignment="Center"
+                            VerticalAlignment="Center"
+                            RecognizesAccessKey="True" />
+                    </Border>
+                    <ControlTemplate.Triggers>
+                        <Trigger Property="IsMouseOver" Value="True">
+                            <Setter TargetName="Chrome" Property="Background" Value="#0D000000" />
+                            <Setter Property="Foreground" Value="{DynamicResource TextFillColorPrimaryBrush}" />
+                        </Trigger>
+                        <Trigger Property="IsPressed" Value="True">
+                            <Setter TargetName="Chrome" Property="Background" Value="#14000000" />
+                        </Trigger>
+                    </ControlTemplate.Triggers>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
     <!-- ==================== 浮起操作条（原型 .range-bar） ==================== -->
     <!-- 原型：padding 13px 18px / 圆角 10 / 1px 描边 / 0 8px 24px 投影 -->
     <Style x:Key="AppActionBar" TargetType="Border">
@@ -124,9 +163,9 @@
     </Style>
 
     <!-- ==================== 页面容器 ==================== -->
-    <!-- 原型 .content 的留白为 26px / 30px，底部另留 40px 让内容不会顶到浮起的操作条 -->
+    <!-- 原型 .content 的留白为上 26 / 左右 30 / 下 96（底部留白同时给浮起的操作条让位） -->
     <Style x:Key="PageLayout" TargetType="StackPanel">
-        <Setter Property="Margin" Value="30,26,30,40" />
+        <Setter Property="Margin" Value="30,26,30,96" />
     </Style>
 
     <!-- ==================== 提示横幅（原型 .banner） ==================== -->
@@ -151,6 +190,143 @@
         <Setter Property="Foreground" Value="{StaticResource AppDangerTextBrush}" />
         <Setter Property="TextWrapping" Value="Wrap" />
         <Setter Property="VerticalAlignment" Value="Center" />
+    </Style>
+
+    <!-- ==================== 打开仓库拖放区（原型 .drop-zone） ==================== -->
+    <!--
+        Border 控件不支持虚线边框，虚线由叠加在其上的 Rectangle（AppDropZoneOutline）画出来；
+        原型底色 accent-soft = rgba(0,103,192,.10)，悬停加深到 accent-soft-2 = .16。
+        这里不设 Padding：内边距必须给在内容侧（见 RepositoryPage），虚线框才能贴着蓝色区域的
+        边缘画——原型的 border 就在元素边缘，padding 在边框内侧。
+    -->
+    <Style x:Key="AppDropZone" TargetType="Border">
+        <Setter Property="Background" Value="{StaticResource AppAccentSoftBrush}" />
+        <Setter Property="CornerRadius" Value="10" />
+        <Setter Property="Cursor" Value="Hand" />
+        <Setter Property="SnapsToDevicePixels" Value="True" />
+        <Style.Triggers>
+            <Trigger Property="IsMouseOver" Value="True">
+                <Setter Property="Background" Value="#290067C0" />
+            </Trigger>
+        </Style.Triggers>
+    </Style>
+
+    <Style x:Key="AppDropZoneOutline" TargetType="Rectangle">
+        <Setter Property="Stroke" Value="#660067C0" />
+        <Setter Property="StrokeThickness" Value="1.5" />
+        <Setter Property="StrokeDashArray" Value="4 3" />
+        <Setter Property="RadiusX" Value="10" />
+        <Setter Property="RadiusY" Value="10" />
+        <!-- 虚线框只负责画线，点击交给外层 Border -->
+        <Setter Property="IsHitTestVisible" Value="False" />
+        <Style.Triggers>
+            <!-- 原型 .drop-zone:hover 时虚线描边变为实色强调色（border-color: accent） -->
+            <DataTrigger
+                Binding="{Binding IsMouseOver, RelativeSource={RelativeSource AncestorType=Border}}"
+                Value="True">
+                <Setter Property="Stroke" Value="{StaticResource AppAccentBrush}" />
+            </DataTrigger>
+        </Style.Triggers>
+    </Style>
+
+    <!-- ==================== 等宽小徽章（原型 .chip.mono：分支名、路径片段） ==================== -->
+    <!-- 原型 .chip：高 24px、左右内边距 10、圆角 12；文字垂直居中交给 AppMonoChipText -->
+    <Style x:Key="AppMonoChip" TargetType="Border">
+        <Setter Property="Height" Value="24" />
+        <Setter Property="Background" Value="#FFEFEFEF" />
+        <Setter Property="BorderBrush" Value="{StaticResource AppStrokeBrush}" />
+        <Setter Property="BorderThickness" Value="1" />
+        <Setter Property="CornerRadius" Value="12" />
+        <Setter Property="Padding" Value="10,0" />
+        <Setter Property="VerticalAlignment" Value="Center" />
+        <Setter Property="SnapsToDevicePixels" Value="True" />
+    </Style>
+
+    <Style x:Key="AppMonoChipText" TargetType="TextBlock">
+        <Setter Property="FontFamily" Value="{StaticResource AppMonospaceFontFamily}" />
+        <Setter Property="FontSize" Value="12" />
+        <!-- 原型 .chip.mono：字重 500 -->
+        <Setter Property="FontWeight" Value="Medium" />
+        <Setter Property="Foreground" Value="{DynamicResource TextFillColorPrimaryBrush}" />
+        <Setter Property="VerticalAlignment" Value="Center" />
+    </Style>
+
+    <!-- 最近仓库卡片的图标底（原型 .repo-card .repo-ico：135° 渐变；蓝 / 紫 / 绿按列表序号轮换） -->
+    <LinearGradientBrush x:Key="AppRepoIconBackgroundBrush" StartPoint="0,0" EndPoint="1,1">
+        <GradientStop Offset="0" Color="{StaticResource AppAccentColor}" />
+        <GradientStop Offset="1" Color="#FF3B9DF0" />
+    </LinearGradientBrush>
+
+    <!-- 原型第二张示例卡的紫色渐变 -->
+    <LinearGradientBrush x:Key="AppRepoIconPurpleBackgroundBrush" StartPoint="0,0" EndPoint="1,1">
+        <GradientStop Offset="0" Color="#FF7A3FBF" />
+        <GradientStop Offset="1" Color="#FFA972E8" />
+    </LinearGradientBrush>
+
+    <!-- 原型第三张示例卡的绿色渐变 -->
+    <LinearGradientBrush x:Key="AppRepoIconGreenBackgroundBrush" StartPoint="0,0" EndPoint="1,1">
+        <GradientStop Offset="0" Color="#FF107C10" />
+        <GradientStop Offset="1" Color="#FF4CBF4C" />
+    </LinearGradientBrush>
+
+    <!-- 警告横幅（与 AppErrorBanner 同构：11px 14px 内边距、8px 圆角、warn 底 + 25% 描边） -->
+    <Style x:Key="AppWarningBanner" TargetType="Border">
+        <Setter Property="Background" Value="{StaticResource AppWarnSoftBrush}" />
+        <Setter Property="BorderBrush" Value="{StaticResource AppWarnBorderBrush}" />
+        <Setter Property="BorderThickness" Value="1" />
+        <Setter Property="CornerRadius" Value="8" />
+        <Setter Property="Padding" Value="14,11" />
+        <Setter Property="SnapsToDevicePixels" Value="True" />
+    </Style>
+
+    <Style x:Key="AppWarningText" TargetType="TextBlock">
+        <Setter Property="FontFamily" Value="{StaticResource AppFontFamily}" />
+        <Setter Property="FontSize" Value="13" />
+        <Setter Property="LineHeight" Value="19" />
+        <Setter Property="Foreground" Value="{StaticResource AppWarnTextBrush}" />
+        <Setter Property="TextWrapping" Value="Wrap" />
+        <Setter Property="VerticalAlignment" Value="Center" />
+    </Style>
+
+    <!--
+        最近仓库卡片（原型 .repo-card：上下 16 左右 18 内边距）。
+        悬停对齐原型 .card.hoverable:hover 的三件事：描边转 25% 强调色、
+        投影换成更大的 hover 投影、整卡上浮 1px（0.15s 过渡，与原型 transition 一致）。
+    -->
+    <Style x:Key="AppRecentRepoCard" TargetType="Border" BasedOn="{StaticResource AppCard}">
+        <Setter Property="Padding" Value="18,16" />
+        <Setter Property="Cursor" Value="Hand" />
+        <Setter Property="RenderTransform">
+            <Setter.Value>
+                <TranslateTransform Y="0" />
+            </Setter.Value>
+        </Setter>
+        <Style.Triggers>
+            <Trigger Property="IsMouseOver" Value="True">
+                <Setter Property="BorderBrush" Value="#400067C0" />
+                <Setter Property="Effect" Value="{StaticResource AppCardHoverShadowEffect}" />
+                <Trigger.EnterActions>
+                    <BeginStoryboard>
+                        <Storyboard>
+                            <DoubleAnimation
+                                Storyboard.TargetProperty="(UIElement.RenderTransform).(TranslateTransform.Y)"
+                                To="-1"
+                                Duration="0:0:0.15" />
+                        </Storyboard>
+                    </BeginStoryboard>
+                </Trigger.EnterActions>
+                <Trigger.ExitActions>
+                    <BeginStoryboard>
+                        <Storyboard>
+                            <DoubleAnimation
+                                Storyboard.TargetProperty="(UIElement.RenderTransform).(TranslateTransform.Y)"
+                                To="0"
+                                Duration="0:0:0.15" />
+                        </Storyboard>
+                    </BeginStoryboard>
+                </Trigger.ExitActions>
+            </Trigger>
+        </Style.Triggers>
     </Style>
 
     <!-- ==================== 左侧导航项（原型 .nav-item） ==================== -->
