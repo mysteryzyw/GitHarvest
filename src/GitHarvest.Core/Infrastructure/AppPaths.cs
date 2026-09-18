@@ -12,12 +12,22 @@ public static class AppPaths
     /// <summary>数据目录下的日志子目录名。</summary>
     public const string LogFolderName = "logs";
 
+    /// <summary>全局设置文件名。</summary>
+    public const string SettingsFileName = "settings.json";
+
     /// <summary>数据目录：%APPDATA%\GitHarvest。</summary>
     public static string GetDataDirectory() => GetDataDirectory(ResolveRoamingAppDataDirectory());
 
     /// <summary>在指定漫游应用数据根目录下解析数据目录。</summary>
     public static string GetDataDirectory(string roamingAppDataDirectory)
         => Path.Combine(Normalize(roamingAppDataDirectory), ProductFolderName);
+
+    /// <summary>全局设置文件：%APPDATA%\GitHarvest\settings.json。</summary>
+    public static string GetSettingsFilePath() => GetSettingsFilePath(ResolveRoamingAppDataDirectory());
+
+    /// <summary>在指定漫游应用数据根目录下解析全局设置文件。</summary>
+    public static string GetSettingsFilePath(string roamingAppDataDirectory)
+        => Path.Combine(GetDataDirectory(roamingAppDataDirectory), SettingsFileName);
 
     /// <summary>日志目录：%APPDATA%\GitHarvest\logs。</summary>
     public static string GetLogDirectory() => GetLogDirectory(ResolveRoamingAppDataDirectory());

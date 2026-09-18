@@ -129,6 +129,30 @@
         <Setter Property="Margin" Value="30,26,30,40" />
     </Style>
 
+    <!-- ==================== 提示横幅（原型 .banner） ==================== -->
+    <!--
+        原型 .banner.err：11px 14px 内边距、8px 圆角、err-bg 底 + 25% err 描边、正文 13px 深红。
+        横幅显示与否由使用它的页面用 DataTrigger 决定（可见性属于页面语义，不在样式里）。
+    -->
+    <Style x:Key="AppErrorBanner" TargetType="Border">
+        <Setter Property="Background" Value="{StaticResource AppDangerSoftBrush}" />
+        <Setter Property="BorderBrush" Value="{StaticResource AppDangerBorderBrush}" />
+        <Setter Property="BorderThickness" Value="1" />
+        <Setter Property="CornerRadius" Value="8" />
+        <Setter Property="Padding" Value="14,11" />
+        <Setter Property="SnapsToDevicePixels" Value="True" />
+    </Style>
+
+    <!-- 横幅正文（原型 .banner 的 13px） -->
+    <Style x:Key="AppBannerText" TargetType="TextBlock">
+        <Setter Property="FontFamily" Value="{StaticResource AppFontFamily}" />
+        <Setter Property="FontSize" Value="13" />
+        <Setter Property="LineHeight" Value="19" />
+        <Setter Property="Foreground" Value="{StaticResource AppDangerTextBrush}" />
+        <Setter Property="TextWrapping" Value="Wrap" />
+        <Setter Property="VerticalAlignment" Value="Center" />
+    </Style>
+
     <!-- ==================== 左侧导航项（原型 .nav-item） ==================== -->
     <!--
         WpfUI 自带的项模板（NavigationViewCompact.xaml 的 LeftCompactNavigationViewItemTemplate）

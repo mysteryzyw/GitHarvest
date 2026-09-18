@@ -27,6 +27,15 @@
     <SolidColorBrush x:Key="AppSuccessBrush" Color="#FF107C10" />
     <SolidColorBrush x:Key="AppSuccessSoftBrush" Color="#FFDFF6DD" />
 
+    <!--
+        错误提示横幅：原型 .banner.err 用的就是 :root 里的 err 与 err-bg 两个变量，
+        描边是 rgba(196,43,28,.25)，正文色是比 err 更深的 #8C1D13（浅底上够对比度）。
+    -->
+    <SolidColorBrush x:Key="AppDangerBrush" Color="#FFC42B1C" />
+    <SolidColorBrush x:Key="AppDangerSoftBrush" Color="#FFFDE7E9" />
+    <SolidColorBrush x:Key="AppDangerBorderBrush" Color="#40C42B1C" />
+    <SolidColorBrush x:Key="AppDangerTextBrush" Color="#FF8C1D13" />
+
     <!-- ==================== 中性色 ==================== -->
     <SolidColorBrush x:Key="AppStrokeBrush" Color="#0F000000" />
     <SolidColorBrush x:Key="AppStrokeStrongBrush" Color="#72000000" />

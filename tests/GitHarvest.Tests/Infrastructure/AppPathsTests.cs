@@ -25,6 +25,14 @@ public class AppPathsTests
             AppPaths.GetLogDirectory(RoamingRoot));
     }
 
+    [Fact]
+    public void 全局设置文件位于数据目录下()
+    {
+        Assert.Equal(
+            Path.Combine(RoamingRoot, "GitHarvest", "settings.json"),
+            AppPaths.GetSettingsFilePath(RoamingRoot));
+    }
+
     [Theory]
     [InlineData(@"C:\Users\tester\AppData\Roaming\")]
     [InlineData(@"C:\Users\tester\AppData\Roaming\\")]

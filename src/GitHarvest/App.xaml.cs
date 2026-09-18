@@ -1,8 +1,10 @@
 ﻿using System.Reflection;
 using System.Windows;
 using System.Windows.Media;
+using GitHarvest.Core.Git;
 using GitHarvest.Core.Infrastructure;
 using GitHarvest.Core.Navigation;
+using GitHarvest.Core.Settings;
 using GitHarvest.Shell;
 using GitHarvest.ViewModels;
 using GitHarvest.Views;
@@ -44,6 +46,10 @@ public partial class App : Application
 
         var window = _services.GetRequiredService<MainWindow>();
         window.Show();
+
+        // git 环境自检：放在窗口显示之后——探测要启动 git 子进程（几十毫秒），不该拖慢首屏。
+        // 结果写进日志（版本、来源、路径），首页的引导横幅也复用这份缓存。
+        _ = ProbeGitEnvironmentAsync(_services.GetRequiredService<IGitEnvironmentService>());
     }
 
     protected override void OnExit(ExitEventArgs e)
@@ -61,8 +67,18 @@ public partial class App : Application
     {
         var services = new ServiceCollection();
 
-        // Core 服务：ticket 01 只需要导航目录；git / 设置 / 导出等服务由后续 ticket 注册
+        // 日志器：Core 里的服务（git 自检、设置读取）都注入这一个文件日志器
+        services.AddSingleton<ILogger>(Log.Logger);
+
+        // Core 服务：导航目录 + git 访问基础设施（ticket 02）
         services.AddSingleton<INavigationCatalog, NavigationCatalog>();
+        services.AddSingleton(provider => GitExecutableLocator.ForCurrentEnvironment());
+        services.AddSingleton<GitCliRunner>();
+        services.AddSingleton(provider => new SettingsJsonGitPathProvider(
+            AppPaths.GetSettingsFilePath(),
+            provider.GetRequiredService<ILogger>()));
+        services.AddSingleton<IGitExecutablePathProvider>(provider => provider.GetRequiredService<SettingsJsonGitPathProvider>());
+        services.AddSingleton<IGitEnvironmentService, GitEnvironmentService>();
 
         // 外壳与导航
         services.AddSingleton<ShellViewModel>();
@@ -70,7 +86,8 @@ public partial class App : Application
         services.AddSingleton<IShellNavigator>(provider => provider.GetRequiredService<WpfShellNavigator>());
         services.AddSingleton<MainWindow>();
 
-        // 页面：由 WpfUI 的导航在切换时从容器解析（页面只声明带依赖的构造函数）
+        // 页面与页面级 ViewModel：由 WpfUI 的导航在切换时从容器解析（页面只声明带依赖的构造函数）
+        services.AddTransient<RepositoryViewModel>();
         services.AddTransient<RepositoryPage>();
         services.AddTransient<PickCommitsPage>();
         services.AddTransient<PreviewPage>();
@@ -79,6 +96,19 @@ public partial class App : Application
         services.AddTransient<AboutPage>();
 
         return services.BuildServiceProvider();
+    }
+
+    /// <summary>启动时的 git 环境自检；结果进日志，失败不影响启动（首页横幅会引导用户处理）。</summary>
+    private static async Task ProbeGitEnvironmentAsync(IGitEnvironmentService gitEnvironment)
+    {
+        try
+        {
+            await gitEnvironment.GetStatusAsync();
+        }
+        catch (Exception exception)
+        {
+            Log.Error(exception, "git 环境自检失败。");
+        }
     }
 
     private static string ApplicationVersion =>
