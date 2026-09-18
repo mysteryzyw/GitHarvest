@@ -2,18 +2,21 @@
     x:Class="GitHarvest.Views.RepositoryPage"
     xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-    xmlns:controls="clr-namespace:GitHarvest.Controls"
-    xmlns:ui="http://schemas.lepo.co/wpfui/2022/xaml">
+    xmlns:controls="clr-namespace:GitHarvest.Controls">
+
+    <!--
+        仓库页（工作流第 1 步）。本 ticket 只放骨架占位，业务在 ticket 04 落地。
+        原型里这一页是「欢迎 / 打开仓库」的首屏，既不带步骤指示条也不带底部操作条
+        （首屏靠 hero 区与最近仓库卡片前进，ticket 04 落地），本页对齐这一点。
+    -->
 
     <ScrollViewer HorizontalScrollBarVisibility="Disabled" VerticalScrollBarVisibility="Auto">
         <StackPanel Style="{StaticResource PageLayout}">
 
             <TextBlock Style="{StaticResource PageTitleText}" Text="{Binding CurrentTitle}" />
-            <TextBlock Style="{StaticResource PageSubtitleText}" Text="选中本地 Git 仓库后，从这里开始选定提交并导出更新包。" />
+            <TextBlock Style="{StaticResource PageSubtitleText}" Text="选定两次提交，导出变更文件快照与更新说明，一键生成交付给客户的更新包。" />
 
-            <controls:StepBar Margin="0,20,0,20" />
-
-            <ui:Card Style="{StaticResource AppCard}">
+            <Border Margin="0,20,0,0" Style="{StaticResource AppCard}">
                 <StackPanel>
                     <TextBlock Style="{StaticResource SectionHeaderText}" Text="骨架占位" />
                     <TextBlock
@@ -21,9 +24,7 @@
                         Style="{StaticResource HintText}"
                         Text="本页尚无业务功能。计划落地内容：文件夹选择器打开本地仓库、非仓库目录与提交数不足的明确提示、最近打开的 10 个仓库列表与首次启动引导（ticket 04）。" />
                 </StackPanel>
-            </ui:Card>
-
-            <controls:WorkflowFooter />
+            </Border>
 
         </StackPanel>
     </ScrollViewer>

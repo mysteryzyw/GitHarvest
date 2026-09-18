@@ -2,29 +2,40 @@
     x:Class="GitHarvest.Views.NotesPage"
     xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-    xmlns:controls="clr-namespace:GitHarvest.Controls"
-    xmlns:ui="http://schemas.lepo.co/wpfui/2022/xaml">
+    xmlns:controls="clr-namespace:GitHarvest.Controls">
 
-    <ScrollViewer HorizontalScrollBarVisibility="Disabled" VerticalScrollBarVisibility="Auto">
-        <StackPanel Style="{StaticResource PageLayout}">
+    <!-- 更新说明页（工作流第 4 步）。本 ticket 只放骨架占位，业务在 ticket 09、10 落地。 -->
 
-            <TextBlock Style="{StaticResource PageTitleText}" Text="{Binding CurrentTitle}" />
-            <TextBlock Style="{StaticResource PageSubtitleText}" Text="编辑本次交付的更新说明，然后导出更新包。" />
+    <Grid>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="*" />
+            <RowDefinition Height="Auto" />
+        </Grid.RowDefinitions>
 
-            <controls:StepBar Margin="0,20,0,20" />
+        <ScrollViewer
+            Grid.Row="0"
+            HorizontalScrollBarVisibility="Disabled"
+            VerticalScrollBarVisibility="Auto">
+            <StackPanel Style="{StaticResource PageLayout}">
 
-            <ui:Card Style="{StaticResource AppCard}">
-                <StackPanel>
-                    <TextBlock Style="{StaticResource SectionHeaderText}" Text="骨架占位" />
-                    <TextBlock
-                        Margin="0,6,0,0"
-                        Style="{StaticResource HintText}"
-                        Text="本页尚无业务功能。计划落地内容：默认模板生成的更新说明、左右双栏实时预览、占位符插入与「重置为模板」，以及最终导出更新包（ticket 09、10）。" />
-                </StackPanel>
-            </ui:Card>
+                <TextBlock Style="{StaticResource PageTitleText}" Text="{Binding CurrentTitle}" />
+                <TextBlock Style="{StaticResource PageSubtitleText}" Text="由默认模板生成，导出前可编辑；将随更新包一同输出为「更新说明.md」。" />
 
-            <controls:WorkflowFooter />
+                <controls:StepBar Margin="0,20,0,22" />
 
-        </StackPanel>
-    </ScrollViewer>
+                <Border Style="{StaticResource AppCard}">
+                    <StackPanel>
+                        <TextBlock Style="{StaticResource SectionHeaderText}" Text="骨架占位" />
+                        <TextBlock
+                            Margin="0,6,0,0"
+                            Style="{StaticResource HintText}"
+                            Text="本页尚无业务功能。计划落地内容：默认模板生成的更新说明、左右双栏实时预览、占位符插入与「重置为模板」，以及最终导出更新包（ticket 09、10）。" />
+                    </StackPanel>
+                </Border>
+
+            </StackPanel>
+        </ScrollViewer>
+
+        <controls:WorkflowFooter Grid.Row="1" Margin="30,0,30,26" />
+    </Grid>
 </Page>

@@ -26,8 +26,8 @@ public sealed partial class ShellViewModel : ObservableObject
         Refresh();
     }
 
-    /// <summary>当前目的地的标题（页面标题直接取用，避免多处重复维护）。</summary>
-    public string CurrentTitle => _catalog.Get(CurrentPage).Title;
+    /// <summary>当前目的地的页面标题（首屏是欢迎语，其余与导航标题相同，由导航目录统一维护）。</summary>
+    public string CurrentTitle => _catalog.Get(CurrentPage).PageTitleOrDefault;
 
     /// <summary>步骤指示条的四步。</summary>
     public IReadOnlyList<WorkflowStepStatus> Steps { get; private set; } = [];
@@ -35,6 +35,16 @@ public sealed partial class ShellViewModel : ObservableObject
     public bool CanGoPrevious => _catalog.GetPrevious(CurrentPage) is not null;
 
     public bool CanGoNext => _catalog.GetNext(CurrentPage) is not null;
+
+    /// <summary>
+    /// 「下一步」按钮的文案。原型把下一步的目的地写进按钮里（「下一步：导出前总预览 →」），
+    /// 这里同样从导航目录取标题；走到工作流最后一步时按原型显示「开始导出」
+    /// （导出动作在 ticket 10 落地，按钮届时才可用）。
+    /// </summary>
+    public string NextButtonText =>
+        _catalog.GetNext(CurrentPage) is { } next
+            ? $"下一步：{next.Title} →"
+            : _catalog.IsWorkflowStep(CurrentPage) ? "开始导出" : "下一步";
 
     [RelayCommand]
     private void GoPrevious()
@@ -66,5 +76,6 @@ public sealed partial class ShellViewModel : ObservableObject
         OnPropertyChanged(nameof(CurrentTitle));
         OnPropertyChanged(nameof(CanGoPrevious));
         OnPropertyChanged(nameof(CanGoNext));
+        OnPropertyChanged(nameof(NextButtonText));
     }
 }

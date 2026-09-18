@@ -20,19 +20,51 @@
         之后再添加的项不会被登记，左侧选中态就会与内容区不同步。
         导航标题与 Core 的导航目录（NavigationCatalog）保持一致——后者是步骤指示条与页面标题的真相源，
         页面类型与目的地的对应关系登记在 ShellPageRegistry。
+        导航项的 Tag 是原型里 1–4 的步骤序号，只用于显示，不参与任何导航语义。
+        根容器的底色是原型 .window 的 86% 灰（盖住 Mica 透出的壁纸色），标题栏与内容区共享这层底。
     -->
 
-    <Grid>
+    <Grid Background="{StaticResource AppWindowBackgroundBrush}">
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto" />
             <RowDefinition Height="*" />
         </Grid.RowDefinitions>
 
-        <ui:TitleBar Grid.Row="0" Title="GitHarvest">
+        <!-- 标题栏底色：原型在 Mica 上叠 35% 白，让标题栏比内容区更亮一层 -->
+        <Rectangle Grid.Row="0" Fill="{StaticResource AppTitleBarBackgroundBrush}" IsHitTestVisible="False" />
+
+        <ui:TitleBar
+            Grid.Row="0"
+            Height="40"
+            Title="GitHarvest">
             <ui:TitleBar.Icon>
-                <ui:SymbolIcon Symbol="BranchFork24" />
+                <ui:SymbolIcon Foreground="{StaticResource AppAccentBrush}" Symbol="BranchFork24" />
             </ui:TitleBar.Icon>
         </ui:TitleBar>
+
+        <!--
+            窗口底色的染色层：原型 body 在 Mica 底色上叠了三处极淡的径向渐变（蓝 / 紫 / 绿），
+            导航区再叠一层 30% 白。放在导航与内容之下，两侧都是透明背景，因此这层会从两侧一起透出。
+            导航区宽度 256 = OpenPaneLength（248）+ PaneGrid 的左右外边距 4×2；
+            WpfUI 的内容区边框只画内容那一侧，导航区上方的标题栏分割线由这里补齐。
+        -->
+        <Grid Grid.Row="1" IsHitTestVisible="False">
+            <Rectangle Fill="{StaticResource AppBackgroundTintBlueBrush}" />
+            <Rectangle Fill="{StaticResource AppBackgroundTintPurpleBrush}" />
+            <Rectangle Fill="{StaticResource AppBackgroundTintGreenBrush}" />
+
+            <Rectangle
+                Width="256"
+                HorizontalAlignment="Left"
+                Fill="{StaticResource AppNavPaneBackgroundBrush}" />
+
+            <Rectangle
+                Width="256"
+                Height="1"
+                HorizontalAlignment="Left"
+                VerticalAlignment="Top"
+                Fill="{StaticResource AppStrokeBrush}" />
+        </Grid>
 
         <ui:NavigationView
             x:Name="RootNavigation"
@@ -42,34 +74,55 @@
             IsFooterSeparatorVisible="True"
             IsPaneToggleVisible="False"
             IsTopSeparatorVisible="False"
+            ItemTemplate="{StaticResource AppNavigationViewItemTemplate}"
             OpenPaneLength="248"
             PaneDisplayMode="Left">
 
             <ui:NavigationView.MenuItems>
 
-                <ui:NavigationViewItemHeader Text="工作流" />
+                <ui:NavigationViewItemHeader
+                    Margin="12,6,12,10"
+                    FontSize="12"
+                    Foreground="{DynamicResource TextFillColorTertiaryBrush}"
+                    Text="工作流" />
 
-                <ui:NavigationViewItem Content="仓库" TargetPageType="{x:Type views:RepositoryPage}">
+                <ui:NavigationViewItem
+                    Margin="8,1"
+                    Content="仓库"
+                    Tag="1"
+                    TargetPageType="{x:Type views:RepositoryPage}">
                     <ui:NavigationViewItem.Icon>
-                        <ui:SymbolIcon Symbol="Home24" />
+                        <ui:SymbolIcon FontSize="17" Symbol="Home24" />
                     </ui:NavigationViewItem.Icon>
                 </ui:NavigationViewItem>
 
-                <ui:NavigationViewItem Content="选择提交" TargetPageType="{x:Type views:PickCommitsPage}">
+                <ui:NavigationViewItem
+                    Margin="8,1"
+                    Content="选择提交"
+                    Tag="2"
+                    TargetPageType="{x:Type views:PickCommitsPage}">
                     <ui:NavigationViewItem.Icon>
-                        <ui:SymbolIcon Symbol="BranchFork24" />
+                        <ui:SymbolIcon FontSize="17" Symbol="BranchFork24" />
                     </ui:NavigationViewItem.Icon>
                 </ui:NavigationViewItem>
 
-                <ui:NavigationViewItem Content="导出前总预览" TargetPageType="{x:Type views:PreviewPage}">
+                <ui:NavigationViewItem
+                    Margin="8,1"
+                    Content="导出前总预览"
+                    Tag="3"
+                    TargetPageType="{x:Type views:PreviewPage}">
                     <ui:NavigationViewItem.Icon>
-                        <ui:SymbolIcon Symbol="Eye24" />
+                        <ui:SymbolIcon FontSize="17" Symbol="Eye24" />
                     </ui:NavigationViewItem.Icon>
                 </ui:NavigationViewItem>
 
-                <ui:NavigationViewItem Content="更新说明" TargetPageType="{x:Type views:NotesPage}">
+                <ui:NavigationViewItem
+                    Margin="8,1"
+                    Content="更新说明"
+                    Tag="4"
+                    TargetPageType="{x:Type views:NotesPage}">
                     <ui:NavigationViewItem.Icon>
-                        <ui:SymbolIcon Symbol="DocumentText24" />
+                        <ui:SymbolIcon FontSize="17" Symbol="DocumentText24" />
                     </ui:NavigationViewItem.Icon>
                 </ui:NavigationViewItem>
 
@@ -77,15 +130,21 @@
 
             <ui:NavigationView.FooterMenuItems>
 
-                <ui:NavigationViewItem Content="全局设置" TargetPageType="{x:Type views:SettingsPage}">
+                <ui:NavigationViewItem
+                    Margin="8,1"
+                    Content="全局设置"
+                    TargetPageType="{x:Type views:SettingsPage}">
                     <ui:NavigationViewItem.Icon>
-                        <ui:SymbolIcon Symbol="Settings24" />
+                        <ui:SymbolIcon FontSize="17" Symbol="Settings24" />
                     </ui:NavigationViewItem.Icon>
                 </ui:NavigationViewItem>
 
-                <ui:NavigationViewItem Content="关于" TargetPageType="{x:Type views:AboutPage}">
+                <ui:NavigationViewItem
+                    Margin="8,1"
+                    Content="关于"
+                    TargetPageType="{x:Type views:AboutPage}">
                     <ui:NavigationViewItem.Icon>
-                        <ui:SymbolIcon Symbol="Info24" />
+                        <ui:SymbolIcon FontSize="17" Symbol="Info24" />
                     </ui:NavigationViewItem.Icon>
                 </ui:NavigationViewItem>
 

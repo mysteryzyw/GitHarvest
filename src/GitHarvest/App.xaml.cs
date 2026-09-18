@@ -1,5 +1,6 @@
 ﻿using System.Reflection;
 using System.Windows;
+using System.Windows.Media;
 using GitHarvest.Core.Infrastructure;
 using GitHarvest.Core.Navigation;
 using GitHarvest.Shell;
@@ -37,7 +38,12 @@ public partial class App : Application
 
         ApplicationThemeManager.Apply(ApplicationTheme.Light);
 
-        _services.GetRequiredService<MainWindow>().Show();
+        // 强调色固定为原型里的 #0067C0：WpfUI 默认取 Windows 系统强调色，与原型不一致。
+        // 这一步会重算整套 Accent 画刷，导航竖条、主按钮、选中态都随之对齐。
+        ApplicationAccentColorManager.Apply(Color.FromRgb(0x00, 0x67, 0xC0), ApplicationTheme.Light);
+
+        var window = _services.GetRequiredService<MainWindow>();
+        window.Show();
     }
 
     protected override void OnExit(ExitEventArgs e)

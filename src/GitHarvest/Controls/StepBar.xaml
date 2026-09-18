@@ -19,21 +19,43 @@
             <DataTemplate>
                 <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
 
-                    <Border
-                        x:Name="Badge"
+                    <!--
+                        光晕用负外边距外扩，不占布局空间：原型里它是 box-shadow，
+                        不撑开步骤条高度；若让 30px 的圆参与布局，步骤条会整体下移 4px。
+                    -->
+                    <Grid
                         Width="22"
                         Height="22"
-                        Background="{DynamicResource ControlFillColorSecondaryBrush}"
-                        CornerRadius="11">
-                        <TextBlock
-                            x:Name="BadgeText"
+                        VerticalAlignment="Center">
+                        <Border
+                            x:Name="Halo"
+                            Width="30"
+                            Height="30"
+                            Margin="-4"
                             HorizontalAlignment="Center"
                             VerticalAlignment="Center"
-                            FontSize="11.5"
-                            FontWeight="SemiBold"
-                            Foreground="{DynamicResource TextFillColorSecondaryBrush}"
-                            Text="{Binding Ordinal}" />
-                    </Border>
+                            Background="{StaticResource AppAccentSoftBrush}"
+                            CornerRadius="15"
+                            Visibility="Collapsed" />
+
+                        <Border
+                            x:Name="Badge"
+                            Width="22"
+                            Height="22"
+                            HorizontalAlignment="Center"
+                            VerticalAlignment="Center"
+                            Background="{StaticResource AppStepBadgeBrush}"
+                            CornerRadius="11">
+                            <TextBlock
+                                x:Name="BadgeText"
+                                HorizontalAlignment="Center"
+                                VerticalAlignment="Center"
+                                FontSize="11.5"
+                                FontWeight="SemiBold"
+                                Foreground="{DynamicResource TextFillColorSecondaryBrush}"
+                                Text="{Binding Ordinal}" />
+                        </Border>
+                    </Grid>
 
                     <TextBlock
                         x:Name="Label"
@@ -44,17 +66,24 @@
                         Text="{Binding Title}" />
 
                     <Border
+                        x:Name="ConnectorLine"
                         Width="52"
                         Height="1.5"
                         Margin="12,0"
                         VerticalAlignment="Center"
-                        Background="{DynamicResource ControlStrokeColorSecondaryBrush}" />
+                        Background="{StaticResource AppStepLineBrush}" />
 
                 </StackPanel>
 
                 <DataTemplate.Triggers>
-                    <!-- 当前步骤：强调色实心徽章 + 实心标题 -->
+                    <!-- 末项之后不画连接线（原型最后一步右侧没有线）。工作流固定四步，由导航目录保证并有测试覆盖。 -->
+                    <DataTrigger Binding="{Binding Ordinal}" Value="4">
+                        <Setter TargetName="ConnectorLine" Property="Visibility" Value="Collapsed" />
+                    </DataTrigger>
+
+                    <!-- 当前步骤：强调色实心徽章 + 4px 光晕 + 实心标题 -->
                     <DataTrigger Binding="{Binding State}" Value="Current">
+                        <Setter TargetName="Halo" Property="Visibility" Value="Visible" />
                         <Setter TargetName="Badge" Property="Background" Value="{StaticResource AppAccentBrush}" />
                         <Setter TargetName="BadgeText" Property="Foreground" Value="{StaticResource AppOnAccentBrush}" />
                         <Setter TargetName="Label" Property="FontWeight" Value="SemiBold" />

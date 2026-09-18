@@ -2,29 +2,40 @@
     x:Class="GitHarvest.Views.PreviewPage"
     xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-    xmlns:controls="clr-namespace:GitHarvest.Controls"
-    xmlns:ui="http://schemas.lepo.co/wpfui/2022/xaml">
+    xmlns:controls="clr-namespace:GitHarvest.Controls">
 
-    <ScrollViewer HorizontalScrollBarVisibility="Disabled" VerticalScrollBarVisibility="Auto">
-        <StackPanel Style="{StaticResource PageLayout}">
+    <!-- 导出前总预览页（工作流第 3 步）。本 ticket 只放骨架占位，业务在 ticket 08 落地。 -->
 
-            <TextBlock Style="{StaticResource PageTitleText}" Text="{Binding CurrentTitle}" />
-            <TextBlock Style="{StaticResource PageSubtitleText}" Text="按变更类型分组，确认变更范围内的文件清单与统计。" />
+    <Grid>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="*" />
+            <RowDefinition Height="Auto" />
+        </Grid.RowDefinitions>
 
-            <controls:StepBar Margin="0,20,0,20" />
+        <ScrollViewer
+            Grid.Row="0"
+            HorizontalScrollBarVisibility="Disabled"
+            VerticalScrollBarVisibility="Auto">
+            <StackPanel Style="{StaticResource PageLayout}">
 
-            <ui:Card Style="{StaticResource AppCard}">
-                <StackPanel>
-                    <TextBlock Style="{StaticResource SectionHeaderText}" Text="骨架占位" />
-                    <TextBlock
-                        Margin="0,6,0,0"
-                        Style="{StaticResource HintText}"
-                        Text="本页尚无业务功能。计划落地内容：新增 / 删除 / 修改 / 重命名 / 其他 五类分组清单与统计卡片、类型徽章、行内调整输出路径、重新计算（ticket 08）。" />
-                </StackPanel>
-            </ui:Card>
+                <TextBlock Style="{StaticResource PageTitleText}" Text="{Binding CurrentTitle}" />
+                <TextBlock Style="{StaticResource PageSubtitleText}" Text="按变更类型分组，确认变更范围内的文件清单与统计。" />
 
-            <controls:WorkflowFooter />
+                <controls:StepBar Margin="0,20,0,22" />
 
-        </StackPanel>
-    </ScrollViewer>
+                <Border Style="{StaticResource AppCard}">
+                    <StackPanel>
+                        <TextBlock Style="{StaticResource SectionHeaderText}" Text="骨架占位" />
+                        <TextBlock
+                            Margin="0,6,0,0"
+                            Style="{StaticResource HintText}"
+                            Text="本页尚无业务功能。计划落地内容：新增 / 删除 / 修改 / 重命名 / 其他 五类分组清单与统计卡片、类型徽章、行内调整输出路径、重新计算（ticket 08）。" />
+                    </StackPanel>
+                </Border>
+
+            </StackPanel>
+        </ScrollViewer>
+
+        <controls:WorkflowFooter Grid.Row="1" Margin="30,0,30,26" />
+    </Grid>
 </Page>

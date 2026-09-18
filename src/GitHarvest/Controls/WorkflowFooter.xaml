@@ -4,27 +4,32 @@
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
     xmlns:ui="http://schemas.lepo.co/wpfui/2022/xaml">
 
-    <!-- 工作流页脚：上一步 / 下一步。边界上自动禁用（后端为 Core 的步进语义）。 -->
+    <!--
+        工作流页脚：原型里浮在内容区底部的操作条（.range-bar）。
+        原型操作条的左端放本次操作的上文（变更范围、输出路径等），
+        等 ticket 06 / 08 / 09 有了这些信息再往左端加内容；当前只有右端的步进按钮。
+        步进语义与可用性仍由 Core 的导航目录决定，本控件只负责外观。
+    -->
 
-    <StackPanel
-        Margin="0,24,0,0"
-        HorizontalAlignment="Right"
-        Orientation="Horizontal">
+    <Border Style="{StaticResource AppActionBar}">
+        <StackPanel
+            HorizontalAlignment="Right"
+            VerticalAlignment="Center"
+            Orientation="Horizontal">
 
-        <ui:Button
-            MinWidth="96"
-            Appearance="Secondary"
-            Command="{Binding GoPreviousCommand}"
-            Content="上一步"
-            IsEnabled="{Binding CanGoPrevious}" />
+            <ui:Button
+                Command="{Binding GoPreviousCommand}"
+                Content="上一步"
+                IsEnabled="{Binding CanGoPrevious}"
+                Style="{StaticResource AppSecondaryButton}" />
 
-        <ui:Button
-            MinWidth="96"
-            Margin="8,0,0,0"
-            Appearance="Primary"
-            Command="{Binding GoNextCommand}"
-            Content="下一步"
-            IsEnabled="{Binding CanGoNext}" />
+            <ui:Button
+                Margin="8,0,0,0"
+                Command="{Binding GoNextCommand}"
+                Content="{Binding NextButtonText}"
+                IsEnabled="{Binding CanGoNext}"
+                Style="{StaticResource AppPrimaryButton}" />
 
-    </StackPanel>
+        </StackPanel>
+    </Border>
 </UserControl>

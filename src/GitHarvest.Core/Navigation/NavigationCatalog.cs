@@ -6,12 +6,14 @@ namespace GitHarvest.Core.Navigation;
 /// </summary>
 public sealed class NavigationCatalog : INavigationCatalog
 {
+    // 三套文案均按原型：步骤条首尾两步更长（「打开仓库」「更新说明与导出」），
+    // 首屏页面标题是欢迎语；未指定的维度回落到导航标题。
     private static readonly NavigationItem[] WorkflowStepItems =
     [
-        new(ShellPage.Repository, "仓库", ShellPageKind.WorkflowStep, 1),
+        new(ShellPage.Repository, "仓库", ShellPageKind.WorkflowStep, 1, StepTitle: "打开仓库", PageTitle: "欢迎使用 GitHarvest"),
         new(ShellPage.PickCommits, "选择提交", ShellPageKind.WorkflowStep, 2),
         new(ShellPage.Preview, "导出前总预览", ShellPageKind.WorkflowStep, 3),
-        new(ShellPage.Notes, "更新说明", ShellPageKind.WorkflowStep, 4),
+        new(ShellPage.Notes, "更新说明", ShellPageKind.WorkflowStep, 4, StepTitle: "更新说明与导出"),
     ];
 
     private static readonly NavigationItem[] UtilityItems =
@@ -83,7 +85,7 @@ public sealed class NavigationCatalog : INavigationCatalog
         return WorkflowStepItems
             .Select(step => new WorkflowStepStatus(
                 step.Ordinal!.Value,
-                step.Title,
+                step.StepTitleOrDefault,
                 StatusOf(step.Ordinal!.Value, currentOrdinal)))
             .ToArray();
 

@@ -1,16 +1,17 @@
 <Page
     x:Class="GitHarvest.Views.SettingsPage"
     xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
-    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-    xmlns:ui="http://schemas.lepo.co/wpfui/2022/xaml">
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+
+    <!-- 全局设置页（并列工具页，不在四步工作流上）。本 ticket 只放骨架占位，业务在 ticket 12 落地。 -->
 
     <ScrollViewer HorizontalScrollBarVisibility="Disabled" VerticalScrollBarVisibility="Auto">
         <StackPanel Style="{StaticResource PageLayout}">
 
             <TextBlock Style="{StaticResource PageTitleText}" Text="{Binding CurrentTitle}" />
-            <TextBlock Style="{StaticResource PageSubtitleText}" Text="默认输出路径、默认说明模板、默认主题与 git.exe 路径。" />
+            <TextBlock Style="{StaticResource PageSubtitleText}" Text="应用级配置，保存于 %APPDATA%\GitHarvest\settings.json；按仓库记住的值优先于全局默认。" />
 
-            <ui:Card Margin="0,20,0,0" Style="{StaticResource AppCard}">
+            <Border Margin="0,20,0,0" Style="{StaticResource AppCard}">
                 <StackPanel>
                     <TextBlock Style="{StaticResource SectionHeaderText}" Text="骨架占位" />
                     <TextBlock
@@ -18,7 +19,7 @@
                         Style="{StaticResource HintText}"
                         Text="本页尚无设置项。计划落地内容：四项全局设置（可持久化）、主题浅色 / 深色 / 跟随系统即时切换、git.exe 手动路径校验、菜单「打开日志目录」（ticket 12）。" />
                 </StackPanel>
-            </ui:Card>
+            </Border>
 
         </StackPanel>
     </ScrollViewer>

@@ -68,14 +68,15 @@ public class WorkflowStepStatusTests
     }
 
     [Fact]
-    public void 每一步都带有序号与标题且与工作流一致()
+    public void 每一步都带有序号与步骤条标题且与工作流一致()
     {
         var statuses = Catalog.GetStepStatuses(ShellPage.Repository);
 
         Assert.Equal(Catalog.WorkflowSteps.Count, statuses.Count);
         Assert.Equal(new[] { 1, 2, 3, 4 }, statuses.Select(status => status.Ordinal));
+        // 步骤条标题与导航标题是两个维度（原型第 1、4 步更长），这里对的是步骤条那一套
         Assert.Equal(
-            Catalog.WorkflowSteps.Select(step => step.Title),
+            Catalog.WorkflowSteps.Select(step => step.StepTitleOrDefault),
             statuses.Select(status => status.Title));
     }
 

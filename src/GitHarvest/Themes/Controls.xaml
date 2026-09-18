@@ -3,7 +3,14 @@
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
     xmlns:ui="http://schemas.lepo.co/wpfui/2022/xaml">
 
-    <!-- 页面标题 -->
+    <!--
+        应用自有的排版与控件样式，视觉取自 docs/prototype/ui-fluent/index.html。
+        这里的样式都只描述外观，不含任何业务语义。
+    -->
+
+    <!-- ==================== 排版 ==================== -->
+
+    <!-- 页面标题（原型 .page-title：24px / 600 / 字距 -.01em） -->
     <Style x:Key="PageTitleText" TargetType="TextBlock">
         <Setter Property="FontFamily" Value="{StaticResource AppFontFamily}" />
         <Setter Property="FontSize" Value="24" />
@@ -12,7 +19,7 @@
         <Setter Property="TextWrapping" Value="Wrap" />
     </Style>
 
-    <!-- 页面副标题 -->
+    <!-- 页面副标题（原型 .page-sub：13px / 距标题 6px） -->
     <Style x:Key="PageSubtitleText" TargetType="TextBlock">
         <Setter Property="FontFamily" Value="{StaticResource AppFontFamily}" />
         <Setter Property="FontSize" Value="13" />
@@ -56,16 +63,168 @@
         <Setter Property="TextWrapping" Value="Wrap" />
     </Style>
 
-    <!-- 卡片：用 WpfUI 的 Card 取主题一致的底色、描边与圆角 -->
-    <Style x:Key="AppCard" TargetType="ui:Card">
-        <Setter Property="Padding" Value="18,16" />
-        <Setter Property="Background" Value="{DynamicResource CardBackgroundFillColorDefaultBrush}" />
-        <Setter Property="BorderBrush" Value="{DynamicResource CardStrokeColorDefaultBrush}" />
+    <!-- ==================== 卡片（原型 .card / .card.pad） ==================== -->
+    <!--
+        原型卡片是「近白半透明底 + 6% 黑描边 + 8px 圆角 + 柔和投影」。
+        WpfUI 的 ui:Card 不提供 CornerRadius 与 Effect，无法还原圆角与投影，
+        因此这里用 Border 直接描述卡片外观；需要悬浮反馈的卡片再叠加 hoverable 触发器。
+    -->
+    <Style x:Key="AppCard" TargetType="Border">
+        <Setter Property="Background" Value="{StaticResource AppCardBackgroundBrush}" />
+        <Setter Property="BorderBrush" Value="{StaticResource AppCardBorderBrush}" />
+        <Setter Property="BorderThickness" Value="1" />
+        <Setter Property="CornerRadius" Value="{StaticResource CardCornerRadius}" />
+        <Setter Property="Effect" Value="{StaticResource AppCardShadowEffect}" />
+        <Setter Property="Padding" Value="20,18" />
+        <Setter Property="SnapsToDevicePixels" Value="True" />
     </Style>
 
-    <!-- 页面容器：留白与原型一致 -->
+    <!-- ==================== 按钮（原型 .btn） ==================== -->
+    <!--
+        原型 .btn：高 32 / 圆角 4 / 字号 13 / 左右内边距 14。
+        必须 BasedOn WpfUI 的隐式按钮样式：一旦给控件显式设置 Style，隐式样式就不再参与，
+        按钮会退化成 WPF 自带的灰色方块（Background #DDDDDD）。
+    -->
+    <Style
+        x:Key="AppButtonBase"
+        BasedOn="{StaticResource {x:Type ui:Button}}"
+        TargetType="{x:Type ui:Button}">
+        <Setter Property="FontFamily" Value="{StaticResource AppFontFamily}" />
+        <Setter Property="FontSize" Value="13" />
+        <Setter Property="MinHeight" Value="32" />
+        <Setter Property="MinWidth" Value="0" />
+        <Setter Property="Padding" Value="14,0" />
+        <Setter Property="CornerRadius" Value="{StaticResource ControlCornerRadius}" />
+    </Style>
+
+    <Style
+        x:Key="AppPrimaryButton"
+        BasedOn="{StaticResource AppButtonBase}"
+        TargetType="{x:Type ui:Button}">
+        <Setter Property="Appearance" Value="Primary" />
+    </Style>
+
+    <Style
+        x:Key="AppSecondaryButton"
+        BasedOn="{StaticResource AppButtonBase}"
+        TargetType="{x:Type ui:Button}">
+        <Setter Property="Appearance" Value="Secondary" />
+    </Style>
+
+    <!-- ==================== 浮起操作条（原型 .range-bar） ==================== -->
+    <!-- 原型：padding 13px 18px / 圆角 10 / 1px 描边 / 0 8px 24px 投影 -->
+    <Style x:Key="AppActionBar" TargetType="Border">
+        <Setter Property="Background" Value="{StaticResource AppBarBackgroundBrush}" />
+        <Setter Property="BorderBrush" Value="{StaticResource AppCardBorderBrush}" />
+        <Setter Property="BorderThickness" Value="1" />
+        <Setter Property="CornerRadius" Value="10" />
+        <Setter Property="Padding" Value="18,13" />
+        <Setter Property="Effect" Value="{StaticResource AppBarShadowEffect}" />
+        <Setter Property="SnapsToDevicePixels" Value="True" />
+    </Style>
+
+    <!-- ==================== 页面容器 ==================== -->
+    <!-- 原型 .content 的留白为 26px / 30px，底部另留 40px 让内容不会顶到浮起的操作条 -->
     <Style x:Key="PageLayout" TargetType="StackPanel">
         <Setter Property="Margin" Value="30,26,30,40" />
     </Style>
+
+    <!-- ==================== 左侧导航项（原型 .nav-item） ==================== -->
+    <!--
+        WpfUI 自带的项模板（NavigationViewCompact.xaml 的 LeftCompactNavigationViewItemTemplate）
+        与原型差异较大：选中态是 6% 灰底而非白色卡片、图标不变强调色、没有序号。
+        这里用自写模板替换，通过 NavigationView.ItemTemplate 注入。
+        序号从项的 Tag 取（原型每项右侧的灰色 1–4），Tag 未被 WpfUI 占用。
+    -->
+    <ControlTemplate x:Key="AppNavigationViewItemTemplate" TargetType="{x:Type ui:NavigationViewItem}">
+        <Grid>
+            <Border
+                x:Name="ItemBorder"
+                MinHeight="37"
+                Background="Transparent"
+                BorderBrush="Transparent"
+                BorderThickness="1"
+                CornerRadius="{StaticResource NavItemCornerRadius}"
+                SnapsToDevicePixels="True">
+                <Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="Auto" />
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="Auto" />
+                    </Grid.ColumnDefinitions>
+
+                    <!-- 图标：原型 17px、距左边 12px、距文字 12px -->
+                    <ContentPresenter
+                        x:Name="IconPresenter"
+                        Grid.Column="0"
+                        Margin="11,0,12,0"
+                        VerticalAlignment="Center"
+                        Content="{TemplateBinding Icon}"
+                        TextElement.FontSize="17"
+                        TextElement.Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
+
+                    <!-- 标题 -->
+                    <ContentPresenter
+                        x:Name="ElementContentPresenter"
+                        Grid.Column="1"
+                        VerticalAlignment="Center"
+                        Content="{TemplateBinding Content}"
+                        ContentTemplate="{TemplateBinding ContentTemplate}"
+                        RecognizesAccessKey="True"
+                        TextElement.FontFamily="{StaticResource AppFontFamily}"
+                        TextElement.FontSize="13.5"
+                        TextElement.Foreground="{TemplateBinding Foreground}" />
+
+                    <!-- 工作流步骤序号（原型 .nav-item .tag） -->
+                    <TextBlock
+                        x:Name="OrdinalText"
+                        Grid.Column="2"
+                        Margin="8,0,11,0"
+                        VerticalAlignment="Center"
+                        FontSize="11"
+                        Foreground="{DynamicResource TextFillColorTertiaryBrush}"
+                        Text="{Binding Path=Tag, RelativeSource={RelativeSource TemplatedParent}}" />
+                </Grid>
+            </Border>
+
+            <!-- 选中态左侧强调竖条：原型 3×18、圆角 2、贴左边缘 -->
+            <Rectangle
+                x:Name="ActiveIndicator"
+                Width="3"
+                Height="18"
+                HorizontalAlignment="Left"
+                VerticalAlignment="Center"
+                Fill="{StaticResource AppAccentBrush}"
+                Opacity="0"
+                RadiusX="2"
+                RadiusY="2" />
+        </Grid>
+
+        <ControlTemplate.Triggers>
+            <!-- 选中：白色卡片观感（底 + 描边 + 投影）、图标转强调色、标题加粗 -->
+            <Trigger Property="IsActive" Value="True">
+                <Setter TargetName="ItemBorder" Property="Background" Value="{StaticResource AppNavItemActiveBrush}" />
+                <Setter TargetName="ItemBorder" Property="BorderBrush" Value="{StaticResource AppCardBorderBrush}" />
+                <Setter TargetName="ItemBorder" Property="Effect" Value="{StaticResource AppCardShadowEffect}" />
+                <Setter TargetName="ActiveIndicator" Property="Opacity" Value="1" />
+                <Setter TargetName="IconPresenter" Property="TextElement.Foreground" Value="{StaticResource AppAccentBrush}" />
+                <Setter TargetName="ElementContentPresenter" Property="TextElement.FontWeight" Value="SemiBold" />
+            </Trigger>
+
+            <!-- 悬停：仅未选中项加浅灰底 -->
+            <MultiTrigger>
+                <MultiTrigger.Conditions>
+                    <Condition Property="IsMouseOver" Value="True" />
+                    <Condition Property="IsActive" Value="False" />
+                </MultiTrigger.Conditions>
+                <Setter TargetName="ItemBorder" Property="Background" Value="{StaticResource AppNavItemHoverBrush}" />
+            </MultiTrigger>
+
+            <!-- 按下：在悬停底基础上再压深一层 -->
+            <Trigger Property="IsPressed" Value="True">
+                <Setter TargetName="ItemBorder" Property="Background" Value="{DynamicResource ControlFillColorTertiaryBrush}" />
+            </Trigger>
+        </ControlTemplate.Triggers>
+    </ControlTemplate>
 
 </ResourceDictionary>

@@ -32,6 +32,25 @@ public class NavigationCatalogTests
     }
 
     [Fact]
+    public void 步骤指示条标题与原型一致()
+    {
+        // 原型步骤条的第 1、4 步标题比左侧导航更长，其余步骤与导航标题相同
+        Assert.Equal(
+            new[] { "打开仓库", "选择提交", "导出前总预览", "更新说明与导出" },
+            Catalog.WorkflowSteps.Select(step => step.StepTitleOrDefault));
+    }
+
+    [Fact]
+    public void 仅首页有独立的页面标题其余回落到导航标题()
+    {
+        // 原型首屏是欢迎语而不是导航标题「仓库」
+        Assert.Equal("欢迎使用 GitHarvest", Catalog.Get(ShellPage.Repository).PageTitleOrDefault);
+        Assert.All(
+            Catalog.All.Where(item => item.Page != ShellPage.Repository),
+            item => Assert.Equal(item.Title, item.PageTitleOrDefault));
+    }
+
+    [Fact]
     public void 全局设置与关于是并列的工具页不属于工作流()
     {
         Assert.Equal(

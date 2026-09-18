@@ -4,44 +4,158 @@
 
     <!--
         设计令牌取自 docs/prototype/ui-fluent/index.html 的 Fluent 调色板。
-        表面与文字颜色走 WpfUI 主题画刷（随深浅主题切换），
-        这里只固定原型中不随主题变化的强调色、状态色、字体与圆角。
+        表面与文字颜色优先走 WpfUI 主题画刷（随深浅主题切换），
+        这里固定原型中不随主题变化、或 WpfUI 未提供的值：强调色、卡片描边与投影、
+        导航项尺寸、浮起操作条、以及窗口底色的三处径向渐变。
+        数值后标注的注释即原型 CSS 中的对应声明。
     -->
 
-    <!-- 强调色 -->
+    <!-- ==================== 强调色 ==================== -->
+    <!-- 原型 :root 的 accent / accent-hover / accent-pressed 三个 CSS 变量 -->
     <Color x:Key="AppAccentColor">#FF0067C0</Color>
+    <Color x:Key="AppAccentHoverColor">#FF005FB8</Color>
+    <Color x:Key="AppAccentPressedColor">#FF004A8E</Color>
+
     <SolidColorBrush x:Key="AppAccentBrush" Color="{StaticResource AppAccentColor}" />
-    <SolidColorBrush x:Key="AppAccentHoverBrush" Color="#FF005FB8" />
-    <SolidColorBrush x:Key="AppAccentPressedBrush" Color="#FF004A8E" />
+    <SolidColorBrush x:Key="AppAccentHoverBrush" Color="{StaticResource AppAccentHoverColor}" />
+    <SolidColorBrush x:Key="AppAccentPressedBrush" Color="{StaticResource AppAccentPressedColor}" />
     <SolidColorBrush x:Key="AppAccentSoftBrush" Color="#1A0067C0" />
     <SolidColorBrush x:Key="AppAccentBorderBrush" Color="#400067C0" />
     <SolidColorBrush x:Key="AppOnAccentBrush" Color="#FFFFFFFF" />
 
-    <!-- 状态色（步骤指示条的「已完成」） -->
+    <!-- ==================== 状态色 ==================== -->
     <SolidColorBrush x:Key="AppSuccessBrush" Color="#FF107C10" />
     <SolidColorBrush x:Key="AppSuccessSoftBrush" Color="#FFDFF6DD" />
 
-    <!-- 中性色（描边、浅底） -->
+    <!-- ==================== 中性色 ==================== -->
     <SolidColorBrush x:Key="AppStrokeBrush" Color="#0F000000" />
     <SolidColorBrush x:Key="AppStrokeStrongBrush" Color="#72000000" />
     <SolidColorBrush x:Key="AppSurfaceBrush" Color="#CCFDFDFD" />
     <SolidColorBrush x:Key="AppSurfaceMutedBrush" Color="#1F000000" />
 
-    <!-- 字体 -->
+    <!-- ==================== 卡片（原型 .card） ==================== -->
+    <!-- 原型卡片底色：rgba(253,253,253,.78) -->
+    <SolidColorBrush x:Key="AppCardBackgroundBrush" Color="#C7FDFDFD" />
+    <!-- 原型 .card 的 card-border: rgba(0,0,0,.0578) -->
+    <SolidColorBrush x:Key="AppCardBorderBrush" Color="#0F000000" />
+    <!--
+        原型 .card 的 card-shadow: 0 2px 4px rgba(0,0,0,.04), 0 0 2px rgba(0,0,0,.06)。
+        WPF 的 DropShadowEffect 只支持单层投影，这里用「小位移 + 中模糊」近似两层叠加的观感。
+    -->
+    <DropShadowEffect
+        x:Key="AppCardShadowEffect"
+        BlurRadius="6"
+        Color="#FF000000"
+        Direction="270"
+        Opacity="0.09"
+        ShadowDepth="1.5" />
+
+    <!-- ==================== 浮起操作条（原型 .range-bar） ==================== -->
+    <!-- 原型 background: rgba(252,252,252,.92) -->
+    <SolidColorBrush x:Key="AppBarBackgroundBrush" Color="#EBFCFCFC" />
+    <!-- 原型 box-shadow: 0 8px 24px rgba(0,0,0,.10) -->
+    <DropShadowEffect
+        x:Key="AppBarShadowEffect"
+        BlurRadius="24"
+        Color="#FF000000"
+        Direction="270"
+        Opacity="0.14"
+        ShadowDepth="4" />
+
+    <!-- ==================== 导航项（原型 .nav-item） ==================== -->
+    <!-- 原型 hover: rgba(0,0,0,.045) -->
+    <SolidColorBrush x:Key="AppNavItemHoverBrush" Color="#0B000000" />
+    <!-- 原型 active: 白色卡片 + 卡片描边 + 卡片投影 -->
+    <SolidColorBrush x:Key="AppNavItemActiveBrush" Color="#FFFCFCFC" />
+    <!-- 原型导航区的白底：background: rgba(255,255,255,.30) -->
+    <SolidColorBrush x:Key="AppNavPaneBackgroundBrush" Color="#4DFFFFFF" />
+    <!-- 原型标题栏的白底：background: rgba(255,255,255,.35) -->
+    <SolidColorBrush x:Key="AppTitleBarBackgroundBrush" Color="#59FFFFFF" />
+    <!--
+        导航项尺寸取自原型 .nav-item：13.5px 字号、17px 图标、12px 图文间距，
+        min-height 由「9px 内边距 ×2 + 17px 图标 + 1px 描边 ×2」得出。
+    -->
+
+    <!-- ==================== 窗口底色（原型 body 的三处径向渐变） ==================== -->
+    <!--
+        原型 .window 的底色 rgba(243,243,243,.86)：86% 不透明的中性灰盖在 Mica 之上。
+        少了这一层，Mica 会把桌面壁纸的颜色透进内容区（实机会偏壁纸色，与原型不符）；
+        保留 14% 透明让 Mica 仍有轻微活性。三处径向渐变与导航区白底都铺在这层灰之上。
+    -->
+    <SolidColorBrush x:Key="AppWindowBackgroundBrush" Color="#DBF3F3F3" />
+    <!--
+        原型用三个 radial-gradient 给底色加极淡的蓝 / 紫 / 绿染色，半径与位置按 1280×840 的窗口换算。
+        单独放在窗口底层铺满，内容区与导航区都是透明背景，因此这层会从两侧透出。
+    -->
+    <RadialGradientBrush
+        x:Key="AppBackgroundTintBlueBrush"
+        Center="0.12,-0.10"
+        GradientOrigin="0.12,-0.10"
+        MappingMode="RelativeToBoundingBox"
+        RadiusX="0.47"
+        RadiusY="0.42">
+        <GradientStop Offset="0" Color="#120067C0" />
+        <GradientStop Offset="0.6" Color="#000067C0" />
+        <GradientStop Offset="1" Color="#000067C0" />
+    </RadialGradientBrush>
+
+    <RadialGradientBrush
+        x:Key="AppBackgroundTintPurpleBrush"
+        Center="1.05,0.15"
+        GradientOrigin="1.05,0.15"
+        MappingMode="RelativeToBoundingBox"
+        RadiusX="0.39"
+        RadiusY="0.36">
+        <GradientStop Offset="0" Color="#0F7A3FBF" />
+        <GradientStop Offset="0.55" Color="#007A3FBF" />
+        <GradientStop Offset="1" Color="#007A3FBF" />
+    </RadialGradientBrush>
+
+    <RadialGradientBrush
+        x:Key="AppBackgroundTintGreenBrush"
+        Center="0.50,1.15"
+        GradientOrigin="0.50,1.15"
+        MappingMode="RelativeToBoundingBox"
+        RadiusX="0.35"
+        RadiusY="0.42">
+        <GradientStop Offset="0" Color="#0D107C10" />
+        <GradientStop Offset="0.6" Color="#00107C10" />
+        <GradientStop Offset="1" Color="#00107C10" />
+    </RadialGradientBrush>
+
+    <!-- ==================== 步骤指示条（原型 .stepbar / .step） ==================== -->
+    <!-- 原型 .step .n 未到达态背景 #E4E4E4 -->
+    <SolidColorBrush x:Key="AppStepBadgeBrush" Color="#FFE4E4E4" />
+    <!-- 原型 .step .line 连接线 #D6D6D6 -->
+    <SolidColorBrush x:Key="AppStepLineBrush" Color="#FFD6D6D6" />
+
+    <!-- ==================== 字体 ==================== -->
     <FontFamily x:Key="AppFontFamily">Segoe UI Variable Text, Segoe UI, Microsoft YaHei UI, Microsoft YaHei</FontFamily>
     <FontFamily x:Key="AppMonospaceFontFamily">Cascadia Mono, Cascadia Code, Consolas, Courier New</FontFamily>
 
-    <!-- 圆角 -->
+    <!-- ==================== 圆角 ==================== -->
     <CornerRadius x:Key="CardCornerRadius">8</CornerRadius>
     <CornerRadius x:Key="ControlCornerRadius">4</CornerRadius>
+    <CornerRadius x:Key="NavItemCornerRadius">6</CornerRadius>
 
-    <!-- 卡片投影 -->
-    <DropShadowEffect
-        x:Key="CardShadowEffect"
-        BlurRadius="4"
-        Color="#FF000000"
-        Direction="270"
-        Opacity="0.10"
-        ShadowDepth="1" />
+    <!-- ==================== 对 WpfUI 默认外观的覆盖 ==================== -->
+    <!--
+        本字典在 App.xaml 中排在 WpfUI 的主题字典之后，因此这里的同名键会胜出
+        （WpfUI 的导航模板对该键用的是 DynamicResource）。
+        WpfUI 默认给内容区铺一层 50% 白（LayerFillColorDefault），叠在 Mica 上几乎全白，
+        卡片（70% 白）与底色就分不出层次；原型的内容区是直接露出 Mica 底色，
+        所以这里改为透明，让窗口底色与染色层透出。
+    -->
+    <SolidColorBrush x:Key="NavigationViewContentBackground" Color="Transparent" />
+
+    <!--
+        主按钮的强调色：WpfUI 的 Appearance="Primary" 走的是 AccentButton* 系列画刷，
+        其默认值由强调色再算一层（比原型更深）。原型主按钮就是强调色本身，
+        因此这里直接覆盖成原型的三态取值，与 AppAccentBrush 保持一致。
+    -->
+    <SolidColorBrush x:Key="AccentButtonBackground" Color="{StaticResource AppAccentColor}" />
+    <SolidColorBrush x:Key="AccentButtonBackgroundPointerOver" Color="{StaticResource AppAccentHoverColor}" />
+    <SolidColorBrush x:Key="AccentButtonBackgroundPressed" Color="{StaticResource AppAccentPressedColor}" />
+    <SolidColorBrush x:Key="AccentButtonForeground" Color="#FFFFFFFF" />
 
 </ResourceDictionary>
