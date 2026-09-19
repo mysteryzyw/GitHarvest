@@ -1,0 +1,253 @@
+<UserControl
+    x:Class="GitHarvest.Views.CommitColumnView"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:ui="http://schemas.lepo.co/wpfui/2022/xaml">
+
+    <!--
+        提交栏（原型 .pick-card：角色区 + 搜索框 + 提交列表）。
+        基准栏与 Head 栏共用本视图：标题、说明与角色底色来自 DataContext（CommitColumnViewModel
+        的 Title / Description / RoleKind）。列表是 ListBox 的 UI 虚拟化 + 滚动到底自动续载
+        （code-behind 的 ScrollChanged）。
+    -->
+
+    <Border Style="{StaticResource AppCard}" Padding="0">
+        <Grid>
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="Auto" />
+            </Grid.RowDefinitions>
+
+            <!-- 角色区（原型 .pick-head：role 图标底 30x30 + 标题/说明 + 底边分隔线） -->
+            <Border Grid.Row="0" Style="{StaticResource AppPickHead}">
+                <Grid Margin="14,14">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="Auto" />
+                        <ColumnDefinition Width="*" />
+                    </Grid.ColumnDefinitions>
+
+                <Border
+                    Grid.Column="0"
+                    Width="30"
+                    Height="30"
+                    Margin="0,0,10,0"
+                    VerticalAlignment="Center"
+                    CornerRadius="6"
+                    Style="{StaticResource AppPickRoleBadge}">
+                    <ui:SymbolIcon FontSize="16" Foreground="#FFFFFFFF">
+                        <ui:SymbolIcon.Style>
+                            <Style TargetType="ui:SymbolIcon">
+                                <!-- 角色图标：基准 = 图钉（锚定起点），Head = 旗（终点）；底色由 AppPickRoleBadge 换 -->
+                                <Setter Property="Symbol" Value="Pin24" />
+                                <Style.Triggers>
+                                    <DataTrigger Binding="{Binding RoleKind}" Value="Head">
+                                        <Setter Property="Symbol" Value="Flag24" />
+                                    </DataTrigger>
+                                </Style.Triggers>
+                            </Style>
+                        </ui:SymbolIcon.Style>
+                    </ui:SymbolIcon>
+                </Border>
+
+                <StackPanel Grid.Column="1" VerticalAlignment="Center">
+                    <TextBlock
+                        FontSize="14"
+                        FontWeight="SemiBold"
+                        Foreground="{DynamicResource TextFillColorPrimaryBrush}"
+                        Text="{Binding Title}" />
+                    <TextBlock
+                        Margin="0,1,0,0"
+                        FontSize="11.5"
+                        Foreground="{DynamicResource TextFillColorTertiaryBrush}"
+                        Text="{Binding Description}" />
+                </StackPanel>
+                </Grid>
+            </Border>
+
+            <!-- 搜索框（原型 .pick-search：过滤词按哈希/信息/作者） -->
+            <ui:TextBox
+                Grid.Row="1"
+                Margin="14,12,14,8"
+                Padding="10,5,10,5"
+                VerticalContentAlignment="Center"
+                FocusVisualStyle="{x:Null}"
+                FontSize="13"
+                PlaceholderText="搜索提交信息 / hash / 作者"
+                Text="{Binding SearchText, UpdateSourceTrigger=PropertyChanged}">
+                <ui:TextBox.Icon>
+                    <ui:SymbolIcon
+                        FontSize="14"
+                        Foreground="{DynamicResource TextFillColorTertiaryBrush}"
+                        Symbol="Search24" />
+                </ui:TextBox.Icon>
+            </ui:TextBox>
+
+            <!--
+                提交列表（原型 .commit-list：max-height 338 自滚）。
+                UI 虚拟化靠 ListBox 默认的 VirtualizingStackPanel（回收模式 + 按项滚动）；
+                固定高度让滚动发生在列表内部——外层页面 ScrollViewer 会给它无限高度、禁掉虚拟化。
+            -->
+            <Grid Grid.Row="2">
+                <ListBox
+                    x:Name="CommitList"
+                    Height="338"
+                    Padding="6,0,6,10"
+                    Background="Transparent"
+                    BorderThickness="0"
+                    ItemContainerStyle="{StaticResource AppCommitListBoxItem}"
+                    ItemsSource="{Binding Commits}"
+                    PreviewMouseWheel="OnCommitListPreviewMouseWheel"
+                    ScrollViewer.ScrollChanged="OnCommitListScrollChanged"
+                    SelectedItem="{Binding SelectedCommit, Mode=TwoWay}"
+                    SelectionMode="Single"
+                    Style="{StaticResource AppCommitList}"
+                    VirtualizingPanel.ScrollUnit="Item"
+                    VirtualizingPanel.VirtualizationMode="Recycling">
+                    <ListBox.ItemTemplate>
+                        <DataTemplate>
+                            <Grid Margin="0" Background="Transparent">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="Auto" />
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+
+                                <!-- 选中圆点（原型 .commit .radio）：非交互，选中态来自列表项 -->
+                                <RadioButton
+                                    Grid.Column="0"
+                                    IsChecked="{Binding IsSelected, RelativeSource={RelativeSource AncestorType=ListBoxItem}, Mode=OneWay}"
+                                    Style="{StaticResource AppCommitRadio}" />
+
+                                <!-- 信息首行 + meta 行（作者 · 相对时间，原型 .commit .msg/.meta） -->
+                                <StackPanel Grid.Column="1" VerticalAlignment="Center">
+                                    <TextBlock
+                                        FontSize="13"
+                                        Foreground="{DynamicResource TextFillColorPrimaryBrush}"
+                                        Text="{Binding Subject}"
+                                        TextTrimming="CharacterEllipsis" />
+                                    <StackPanel Margin="0,3,0,0" Orientation="Horizontal">
+                                        <TextBlock
+                                            FontSize="11.5"
+                                            Foreground="{DynamicResource TextFillColorTertiaryBrush}"
+                                            Text="{Binding AuthorName}" />
+                                        <TextBlock
+                                            Margin="8,0,0,0"
+                                            FontSize="11.5"
+                                            Foreground="{DynamicResource TextFillColorTertiaryBrush}"
+                                            Text="·" />
+                                        <TextBlock
+                                            Margin="8,0,0,0"
+                                            FontSize="11.5"
+                                            Foreground="{DynamicResource TextFillColorTertiaryBrush}"
+                                            Text="{Binding RelativeTimeText}" />
+                                    </StackPanel>
+                                </StackPanel>
+
+                                <!-- 短哈希徽章（原型 .commit .hash；选中转强调色实底） -->
+                                <Border
+                                    Grid.Column="2"
+                                    Margin="11,0,0,0"
+                                    VerticalAlignment="Top"
+                                    Style="{StaticResource AppCommitHashChip}">
+                                    <TextBlock Style="{StaticResource AppCommitHashText}" Text="{Binding ShortHash}" />
+                                </Border>
+                            </Grid>
+                        </DataTemplate>
+                    </ListBox.ItemTemplate>
+                </ListBox>
+
+                <!-- 空态：没有分支可选 / 列表为空（加载中与失败态各自覆盖此层） -->
+                <StackPanel
+                    Margin="20,12"
+                    HorizontalAlignment="Center"
+                    VerticalAlignment="Center">
+                    <StackPanel.Style>
+                        <Style TargetType="StackPanel">
+                            <Setter Property="Visibility" Value="Collapsed" />
+                            <Style.Triggers>
+                                <MultiDataTrigger>
+                                    <MultiDataTrigger.Conditions>
+                                        <Condition Binding="{Binding HasSource}" Value="False" />
+                                    </MultiDataTrigger.Conditions>
+                                    <Setter Property="Visibility" Value="Visible" />
+                                </MultiDataTrigger>
+                                <MultiDataTrigger>
+                                    <MultiDataTrigger.Conditions>
+                                        <Condition Binding="{Binding HasSource}" Value="True" />
+                                        <Condition Binding="{Binding HasLoadError}" Value="False" />
+                                        <Condition Binding="{Binding IsLoading}" Value="False" />
+                                        <Condition Binding="{Binding IsSearching}" Value="False" />
+                                        <Condition Binding="{Binding Commits.Count}" Value="0" />
+                                    </MultiDataTrigger.Conditions>
+                                    <Setter Property="Visibility" Value="Visible" />
+                                </MultiDataTrigger>
+                            </Style.Triggers>
+                        </Style>
+                    </StackPanel.Style>
+                    <TextBlock
+                        HorizontalAlignment="Center"
+                        Style="{StaticResource HintText}"
+                        Text="{Binding EmptyText, FallbackValue=请先在上方的分支下拉中选择一个分支。}"
+                        TextAlignment="Center" />
+                </StackPanel>
+
+                <!-- 读取失败提示（红字） -->
+                <TextBlock
+                    Margin="20,12"
+                    HorizontalAlignment="Center"
+                    VerticalAlignment="Center"
+                    Text="{Binding LoadErrorMessage}"
+                    TextAlignment="Center">
+                    <TextBlock.Style>
+                        <Style BasedOn="{StaticResource HintText}" TargetType="TextBlock">
+                            <Setter Property="Foreground" Value="{StaticResource AppDangerBrush}" />
+                            <Setter Property="Visibility" Value="Collapsed" />
+                            <Style.Triggers>
+                                <DataTrigger Binding="{Binding HasLoadError}" Value="True">
+                                    <Setter Property="Visibility" Value="Visible" />
+                                </DataTrigger>
+                            </Style.Triggers>
+                        </Style>
+                    </TextBlock.Style>
+                </TextBlock>
+
+                <!-- 加载中提示（浏览态首批/续载与搜索态全量检索共用；搜索态文案说明结果还会变全） -->
+                <Border
+                    Margin="0,0,0,10"
+                    Padding="10,6"
+                    HorizontalAlignment="Center"
+                    VerticalAlignment="Bottom"
+                    Background="{DynamicResource ControlFillColorSecondaryBrush}"
+                    CornerRadius="12">
+                    <Border.Style>
+                        <Style TargetType="Border">
+                            <Setter Property="Visibility" Value="Collapsed" />
+                            <Style.Triggers>
+                                <DataTrigger Binding="{Binding IsSearching}" Value="True">
+                                    <Setter Property="Visibility" Value="Visible" />
+                                </DataTrigger>
+                                <DataTrigger Binding="{Binding IsLoading}" Value="True">
+                                    <Setter Property="Visibility" Value="Visible" />
+                                </DataTrigger>
+                            </Style.Triggers>
+                        </Style>
+                    </Border.Style>
+                    <TextBlock x:Name="LoadingHint" FontSize="11.5" Foreground="{DynamicResource TextFillColorSecondaryBrush}">
+                        <TextBlock.Style>
+                            <Style TargetType="TextBlock">
+                                <Setter Property="Text" Value="正在加载提交…" />
+                                <Style.Triggers>
+                                    <DataTrigger Binding="{Binding IsSearching}" Value="True">
+                                        <!-- 搜索态：当前显示的是已加载提交里命中的部分，完整结果还在检索 -->
+                                        <Setter Property="Text" Value="正在检索全部提交…" />
+                                    </DataTrigger>
+                                </Style.Triggers>
+                            </Style>
+                        </TextBlock.Style>
+                    </TextBlock>
+                </Border>
+            </Grid>
+        </Grid>
+    </Border>
+</UserControl>

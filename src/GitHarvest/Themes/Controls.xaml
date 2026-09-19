@@ -452,6 +452,146 @@
         <Setter Property="Margin" Value="10,8,10,4" />
     </Style>
 
+    <!-- ==================== 提交选择（原型 .pick-card / .commit） ==================== -->
+
+    <!--
+        提交栏的角色区（原型 .pick-head：上下 14 左右 16 内边距 + 底边 1px 分隔线）。
+        原型的 40% 白底叠在卡片上的观感差异微小，且 WPF 的 Border 圆角裁切需要额外手段，
+        这里只保留分隔线与内边距（内边距给内容侧的 Grid，Border 自身负责画线）。
+    -->
+    <Style x:Key="AppPickHead" TargetType="Border">
+        <Setter Property="BorderBrush" Value="{StaticResource AppCardBorderBrush}" />
+        <Setter Property="BorderThickness" Value="0,0,0,1" />
+        <Setter Property="SnapsToDevicePixels" Value="True" />
+    </Style>
+
+    <!-- 角色图标底（原型 .pick-head .role：30x30 圆角 6；基准灰、Head 强调色） -->
+    <Style x:Key="AppPickRoleBadge" TargetType="Border">
+        <Setter Property="Background" Value="{StaticResource AppAccentBrush}" />
+        <Setter Property="SnapsToDevicePixels" Value="True" />
+        <Style.Triggers>
+            <DataTrigger Binding="{Binding RoleKind}" Value="Base">
+                <Setter Property="Background" Value="#FF5D5D5D" />
+            </DataTrigger>
+        </Style.Triggers>
+    </Style>
+
+    <!-- 提交列表本体：透明底、无边框，滚动交给 ListBox 默认模板的 ScrollViewer -->
+    <Style x:Key="AppCommitList" TargetType="ListBox">
+        <Setter Property="Foreground" Value="{DynamicResource TextFillColorPrimaryBrush}" />
+        <Setter Property="Background" Value="Transparent" />
+        <Setter Property="BorderThickness" Value="0" />
+        <Setter Property="Padding" Value="0" />
+        <Setter Property="ScrollViewer.HorizontalScrollBarVisibility" Value="Disabled" />
+        <Setter Property="VirtualizingPanel.IsVirtualizing" Value="True" />
+    </Style>
+
+    <!--
+        提交项容器（原型 .commit：圆角 6、内边距 9x10、悬停 4% 黑、选中 accent-soft 底 +
+        25% 强调色描边）。BorderBrush 在未选中时透明，避免每项都画一圈浅线显噪。
+    -->
+    <Style x:Key="AppCommitListBoxItem" TargetType="ListBoxItem">
+        <Setter Property="SnapsToDevicePixels" Value="True" />
+        <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+        <Setter Property="Padding" Value="10,9" />
+        <Setter Property="Margin" Value="0,0,0,2" />
+        <Setter Property="Cursor" Value="Hand" />
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="ListBoxItem">
+                    <Border
+                        x:Name="Chrome"
+                        Background="Transparent"
+                        BorderBrush="Transparent"
+                        BorderThickness="1"
+                        CornerRadius="6"
+                        Padding="{TemplateBinding Padding}"
+                        SnapsToDevicePixels="{TemplateBinding SnapsToDevicePixels}">
+                        <ContentPresenter />
+                    </Border>
+                    <ControlTemplate.Triggers>
+                        <Trigger Property="IsMouseOver" Value="True">
+                            <Setter TargetName="Chrome" Property="Background" Value="#0A000000" />
+                        </Trigger>
+                        <Trigger Property="IsSelected" Value="True">
+                            <Setter TargetName="Chrome" Property="Background" Value="{StaticResource AppAccentSoftBrush}" />
+                            <Setter TargetName="Chrome" Property="BorderBrush" Value="{StaticResource AppAccentBorderBrush}" />
+                        </Trigger>
+                    </ControlTemplate.Triggers>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+    <!--
+        选中圆点（原型 .commit .radio：16px 圆圈 1.5px 灰边；选中转强调色边 + 内 8px 实心点）。
+        用 RadioButton 自模板承载外圈与内点：单选语义与 ListBox 的 IsSelected 天然对齐，
+        非交互（IsHitTestVisible=False），点击由列表项接管。
+    -->
+    <Style x:Key="AppCommitRadio" TargetType="RadioButton">
+        <Setter Property="Width" Value="16" />
+        <Setter Property="Height" Value="16" />
+        <Setter Property="Margin" Value="0,2,11,0" />
+        <Setter Property="VerticalAlignment" Value="Top" />
+        <Setter Property="Focusable" Value="False" />
+        <Setter Property="IsHitTestVisible" Value="False" />
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="RadioButton">
+                    <Grid Width="16" Height="16">
+                        <Ellipse
+                            x:Name="Ring"
+                            Fill="Transparent"
+                            Stroke="#FF9A9A9A"
+                            StrokeThickness="1.5" />
+                        <Ellipse
+                            x:Name="Dot"
+                            Width="8"
+                            Height="8"
+                            Fill="Transparent" />
+                    </Grid>
+                    <ControlTemplate.Triggers>
+                        <Trigger Property="IsChecked" Value="True">
+                            <Setter TargetName="Ring" Property="Stroke" Value="{StaticResource AppAccentBrush}" />
+                            <Setter TargetName="Dot" Property="Fill" Value="{StaticResource AppAccentBrush}" />
+                        </Trigger>
+                    </ControlTemplate.Triggers>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+    <!-- 短哈希徽章（原型 .commit .hash：mono 11px、#EFEFEF 底、1px 控件描边、圆角 4；选中转强调色实底白字） -->
+    <Style x:Key="AppCommitHashChip" TargetType="Border">
+        <Setter Property="Background" Value="#FFEFEFEF" />
+        <Setter Property="BorderBrush" Value="{DynamicResource ControlStrokeColorDefaultBrush}" />
+        <Setter Property="BorderThickness" Value="1" />
+        <Setter Property="CornerRadius" Value="{StaticResource ControlCornerRadius}" />
+        <Setter Property="Padding" Value="7,2.5" />
+        <Setter Property="SnapsToDevicePixels" Value="True" />
+        <Style.Triggers>
+            <DataTrigger
+                Binding="{Binding IsSelected, RelativeSource={RelativeSource AncestorType=ListBoxItem}}"
+                Value="True">
+                <Setter Property="Background" Value="{StaticResource AppAccentBrush}" />
+                <Setter Property="BorderBrush" Value="Transparent" />
+            </DataTrigger>
+        </Style.Triggers>
+    </Style>
+
+    <Style x:Key="AppCommitHashText" TargetType="TextBlock">
+        <Setter Property="FontFamily" Value="{StaticResource AppMonospaceFontFamily}" />
+        <Setter Property="FontSize" Value="11" />
+        <Setter Property="Foreground" Value="{DynamicResource TextFillColorSecondaryBrush}" />
+        <Style.Triggers>
+            <DataTrigger
+                Binding="{Binding IsSelected, RelativeSource={RelativeSource AncestorType=ListBoxItem}}"
+                Value="True">
+                <Setter Property="Foreground" Value="{StaticResource AppOnAccentBrush}" />
+            </DataTrigger>
+        </Style.Triggers>
+    </Style>
+
     <!-- ==================== 左侧导航项（原型 .nav-item） ==================== -->
     <!--
         WpfUI 自带的项模板（NavigationViewCompact.xaml 的 LeftCompactNavigationViewItemTemplate）

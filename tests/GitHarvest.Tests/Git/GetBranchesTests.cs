@@ -30,7 +30,7 @@ public sealed class GetBranchesTests : IDisposable
         Assert.All(branches, branch => Assert.False(branch.IsRemote));
         Assert.All(branches, branch => Assert.False(branch.IsDetached));
         Assert.Equal(["feature/order-export", "main", "release/2.4"], branches.Select(b => b.Name).Order());
-        Assert.Equal("main", Assert.Single(branches.Where(b => b.IsCurrent)).Name);
+        Assert.Equal("main", Assert.Single(branches, b => b.IsCurrent).Name);
     }
 
     [Fact]

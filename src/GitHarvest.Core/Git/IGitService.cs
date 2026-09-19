@@ -47,4 +47,36 @@ public interface IGitService
     Task<FetchResult> FetchAsync(
         string repositoryPath,
         CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// 读取指定引用（分支名 / 远程跟踪分支 / <c>HEAD</c>）可达的提交列表中的一页，
+    /// 新提交在前。<see cref="CommitQuery.Search"/> 非空时按「哈希 / 提交信息 / 作者」过滤
+    /// （大小写不敏感），分页切片作用在过滤后的结果集上；
+    /// <see cref="CommitListResult.HasMore"/> 标记是否还有下一页（驱动界面的滚动增量加载）。
+    /// </summary>
+    /// <param name="repositoryPath">仓库目录（仓库根或其子目录）。</param>
+    /// <param name="reference">提交可达的引用：分支名（含远程跟踪分支）或 <c>HEAD</c>。</param>
+    /// <param name="query">过滤与分页条件。</param>
+    /// <param name="cancellationToken">取消令牌；取消时终止正在执行的 git 进程。</param>
+    /// <returns>读取结果；失败不抛异常，提示在结果里。</returns>
+    /// <exception cref="OperationCanceledException">令牌已取消，或执行过程中被取消。</exception>
+    Task<CommitListResult> GetCommitsAsync(
+        string repositoryPath,
+        string reference,
+        CommitQuery query,
+        CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// 读取单个提交的完整详情：完整提交信息、作者与时间、父提交与该次提交的 diffstat 汇总
+    /// （合并提交按对第一父提交的变更计）。入参接受完整 / 短哈希或其他 git 可解析的提交表达。
+    /// </summary>
+    /// <param name="repositoryPath">仓库目录（仓库根或其子目录）。</param>
+    /// <param name="hash">提交（完整 / 短哈希）。</param>
+    /// <param name="cancellationToken">取消令牌；取消时终止正在执行的 git 进程。</param>
+    /// <returns>详情结果；失败不抛异常，提示在结果里。</returns>
+    /// <exception cref="OperationCanceledException">令牌已取消，或执行过程中被取消。</exception>
+    Task<CommitDetailResult> GetCommitDetailAsync(
+        string repositoryPath,
+        string hash,
+        CancellationToken cancellationToken = default);
 }

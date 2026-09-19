@@ -5,15 +5,16 @@ using GitHarvest.Core.Git;
 using GitHarvest.Core.Interaction;
 using GitHarvest.Core.Navigation;
 using GitHarvest.Core.Settings;
+using Serilog;
 
 namespace GitHarvest.ViewModels;
 
 /// <summary>
 /// 选择提交页（工作流第 2 步）的状态：分支选择（本地/远程分组、过滤、游离标注）、
-/// 「拉取」刷新，以及上次选中分支的记忆与自动选中。
-/// 只依赖 Core 接口——分支与拉取走 <see cref="IGitService"/>，上次分支走
-/// <see cref="ISettingsService"/>，当前仓库来自 <see cref="IRepositorySession"/>；
-/// 提交列表（基准/Head 双栏）在 ticket 07 于本类继续扩展。
+/// 「拉取」刷新、上次选中分支的记忆与自动选中，以及基准/Head 双栏提交列表
+/// （搜索过滤、滚动增量加载、单提交详情预览与变更范围指示）。
+/// 只依赖 Core 接口——分支、提交与拉取走 <see cref="IGitService"/>，上次分支走
+/// <see cref="ISettingsService"/>，当前仓库来自 <see cref="IRepositorySession"/>。
 /// </summary>
 public sealed partial class PickCommitsViewModel : ObservableObject
 {
@@ -21,6 +22,9 @@ public sealed partial class PickCommitsViewModel : ObservableObject
     private readonly ISettingsService _settings;
     private readonly IRepositorySession _session;
     private readonly IShellNavigator _navigator;
+
+    /// <summary>两栏共享的提交搜索缓存（首次搜索后台整份读一次，之后过滤与翻页零 git 调用）。</summary>
+    private readonly CommitSearchCache _commitCache;
 
     /// <summary>全量分支候选项（过滤前的源），过滤投影到 <see cref="BranchGroups"/>。</summary>
     private IReadOnlyList<BranchItem> _allBranches = [];
@@ -30,23 +34,70 @@ public sealed partial class PickCommitsViewModel : ObservableObject
         IGitService gitService,
         ISettingsService settings,
         IRepositorySession session,
-        IShellNavigator navigator)
+        IShellNavigator navigator,
+        ILogger logger)
     {
         ArgumentNullException.ThrowIfNull(shell);
         ArgumentNullException.ThrowIfNull(gitService);
         ArgumentNullException.ThrowIfNull(settings);
         ArgumentNullException.ThrowIfNull(session);
         ArgumentNullException.ThrowIfNull(navigator);
+        ArgumentNullException.ThrowIfNull(logger);
 
         Shell = shell;
         _gitService = gitService;
         _settings = settings;
         _session = session;
         _navigator = navigator;
+        _commitCache = new CommitSearchCache(gitService, logger);
+
+        BaseList = new CommitColumnViewModel(gitService, _commitCache)
+        {
+            Title = "基准提交（Base）",
+            Description = "其内容代表「更新前」状态，本身变更不导出",
+            RoleKind = CommitColumnRole.Base,
+        };
+        HeadList = new CommitColumnViewModel(gitService, _commitCache)
+        {
+            Title = "Head 提交",
+            Description = "其内容代表「更新后」状态，本身变更包含在导出内",
+            RoleKind = CommitColumnRole.Head,
+        };
+        BaseList.SelectionActed += OnColumnSelectionActed;
+        HeadList.SelectionActed += OnColumnSelectionActed;
+        BaseList.PropertyChanged += OnColumnPropertyChanged;
+        HeadList.PropertyChanged += OnColumnPropertyChanged;
+        Preview = new CommitPreviewViewModel(gitService);
     }
 
     /// <summary>外壳状态（页面标题、步骤指示条等）。</summary>
     public ShellViewModel Shell { get; }
+
+    /// <summary>基准提交栏：变更范围的起点（「更新前」状态）。</summary>
+    public CommitColumnViewModel BaseList { get; }
+
+    /// <summary>Head 提交栏：变更范围的终点（「更新后」状态）。</summary>
+    public CommitColumnViewModel HeadList { get; }
+
+    /// <summary>提交详情预览（最后点选的提交的完整信息）。</summary>
+    public CommitPreviewViewModel Preview { get; }
+
+    /// <summary>基准与 Head 是否都已指定（驱动范围条与「下一步」的可达性提示）。</summary>
+    public bool HasRange => BaseList.SelectedCommit is not null && HeadList.SelectedCommit is not null;
+
+    /// <summary>范围条上基准一侧的短哈希；未指定时为「—」。</summary>
+    public string RangeBaseHash => BaseList.SelectedCommit?.ShortHash ?? "—";
+
+    /// <summary>范围条上 Head 一侧的短哈希；未指定时为「—」。</summary>
+    public string RangeHeadHash => HeadList.SelectedCommit?.ShortHash ?? "—";
+
+    /// <summary>范围条的状态文案：选齐后说明变更范围的语义（双点 base..head）；
+    /// 祖先校验（merge-base）与文件清单属于第 3 步「导出前总预览」，本页不重复做。
+    /// </summary>
+    public string RangeText =>
+        HasRange
+            ? $"变更范围 {RangeBaseHash}..{RangeHeadHash}（不含基准、含 Head）。"
+            : "请分别在两栏指定基准提交与 Head 提交。";
 
     /// <summary>当前打开的仓库（来自会话）；未打开时页面显示「先打开仓库」的引导。</summary>
     public RepositoryInfo? Repository => _session.OpenedRepository;
@@ -160,6 +211,8 @@ public sealed partial class PickCommitsViewModel : ObservableObject
             }
 
             InfoMessage = "远程跟踪分支已更新。";
+            // 远程引用更新可能改变所选引用的历史：整份提交缓存失效，下次搜索重新读取。
+            _commitCache.Invalidate(repository.RootPath, SelectedBranch?.Name);
             await RefreshBranchesAsync(repository.RootPath, SelectedBranch?.Name);
         }
         catch (OperationCanceledException)
@@ -221,15 +274,31 @@ public sealed partial class PickCommitsViewModel : ObservableObject
             newValue.IsSelected = true;
         }
 
+        // 分支变化同时驱动提交列表：重置双栏到新分支的历史（Head 栏默认选中分支最新提交，
+        // 让「导出终点」有合理的起点值；基准留给用户明确指定）。
+        if (Repository is { } repository && newValue is not null)
+        {
+            // 换了分支：两栏共享的提交缓存整份失效（新分支的历史是另一份数据）。
+            _commitCache.Invalidate(repository.RootPath, newValue.Name);
+            BaseList.Reset(repository.RootPath, newValue.Name);
+            HeadList.Reset(repository.RootPath, newValue.Name, autoSelectFirst: true);
+        }
+        else
+        {
+            _commitCache.Invalidate(null, null);
+            BaseList.Reset(string.Empty, string.Empty);
+            HeadList.Reset(string.Empty, string.Empty);
+        }
+
         // 记住每个仓库上次选中的分支（整体替换语义：先取出现状再改一个字段，ticket 03 的交接）。
         // 自动选中（加载时）同样流经这里，写回同样的值，无副作用。
-        if (newValue is null || Repository is not { } repository)
+        if (newValue is null || Repository is not { } openedRepository)
         {
             return;
         }
 
-        var state = _settings.GetRepositoryState(repository.RootPath);
-        _settings.SaveRepositoryState(repository.RootPath, state with { LastBranch = newValue.Name });
+        var state = _settings.GetRepositoryState(openedRepository.RootPath);
+        _settings.SaveRepositoryState(openedRepository.RootPath, state with { LastBranch = newValue.Name });
     }
 
     partial void OnFilterTextChanged(string? value) => ApplyFilter();
@@ -259,6 +328,30 @@ public sealed partial class PickCommitsViewModel : ObservableObject
                 .OrderBy(group => group.Key) // 本地组（false）在前，远程组在后
                 .Select(group => new BranchGroup(group.Key ? "远程分支" : "本地分支", [.. group])),
         ];
+    }
+
+    /// <summary>
+    /// 任一栏的选中项变化（用户点选）：更新详情预览为「最后点选的提交」——
+    /// 详情卡是两栏共用的查看入口，显示的是用户最近关心（最近点击）的那个提交。
+    /// </summary>
+    private void OnColumnSelectionActed(object? sender, CommitItem? commit)
+    {
+        if (Repository is { } repository)
+        {
+            _ = Preview.LoadAsync(repository.RootPath, commit);
+        }
+    }
+
+    /// <summary>栏的选中项变化时同步范围条（哈希 chip 与状态文案都来自两栏的选中状态）。</summary>
+    private void OnColumnPropertyChanged(object? sender, System.ComponentModel.PropertyChangedEventArgs e)
+    {
+        if (e.PropertyName == nameof(CommitColumnViewModel.SelectedCommit))
+        {
+            OnPropertyChanged(nameof(HasRange));
+            OnPropertyChanged(nameof(RangeBaseHash));
+            OnPropertyChanged(nameof(RangeHeadHash));
+            OnPropertyChanged(nameof(RangeText));
+        }
     }
 }
 

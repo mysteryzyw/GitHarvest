@@ -287,6 +287,289 @@ public sealed class GitService : IGitService
         return FetchResult.Succeeded();
     }
 
+    /// <inheritdoc />
+    public async Task<CommitListResult> GetCommitsAsync(
+        string repositoryPath,
+        string reference,
+        CommitQuery query,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(repositoryPath);
+        ArgumentException.ThrowIfNullOrWhiteSpace(reference);
+        ArgumentNullException.ThrowIfNull(query);
+        if (!query.IsValid)
+        {
+            throw new ArgumentOutOfRangeException(nameof(query), "分页偏移不能为负、页大小必须为正。");
+        }
+
+        if (!Directory.Exists(repositoryPath))
+        {
+            _logger.Warning("读取提交列表失败，目录不存在：{RepositoryPath}", repositoryPath);
+            return CommitListResult.Failed(
+                CommitListFailure.DirectoryNotFound,
+                $"仓库目录不存在：{repositoryPath}");
+        }
+
+        var status = await _gitEnvironment.GetStatusAsync(cancellationToken).ConfigureAwait(false);
+        if (!status.IsAvailable || status.ExecutablePath is not { } gitPath)
+        {
+            return CommitListResult.Failed(
+                CommitListFailure.GitUnavailable,
+                "Git 尚未就绪，无法读取提交列表：请先按首页引导安装或配置 Git。");
+        }
+
+        // 列表项与分支 Tip 同一组字段（复用 CommitSummary）：短哈希/信息首行/作者/作者时间。
+        // 字段间 %00 分隔、按行切记录——%(subject) 只有信息首行不含换行，字段值不可能含 NUL，
+        // 中文提交信息与作者不做转义（与分支枚举同一手法）。
+        const string format = "%h%x00%s%x00%an%x00%aI";
+        var logArguments = new List<string> { "log", $"--format={format}" };
+
+        var search = query.Search?.Trim();
+        if (string.IsNullOrEmpty(search))
+        {
+            // 无过滤词（浏览的主力路径）：分页下推给 git，--skip/--max-count 只取一页 + 1 条探测下一页。
+            logArguments.Add($"--skip={query.Offset}");
+            logArguments.Add($"--max-count={query.Limit + 1}");
+        }
+        else
+        {
+            // 有过滤词（一次性动作）：全量读取（受扫描上限保护）后在内存里过滤——
+            // 实测 git 的 --grep 与 --author 同给时是 AND 而非 OR，与界面「哈希 / 信息 / 作者
+            // 任一命中」的语义不符，故过滤统一在内存里做。
+            logArguments.Add("--max-count=" + MaxScanCommitCount);
+        }
+
+        logArguments.Add(reference);
+
+        var log = await RunGitAsync(gitPath, logArguments, repositoryPath, cancellationToken).ConfigureAwait(false);
+        if (!log.IsSuccess)
+        {
+            return ClassifyCommitReadFailure(reference, log);
+        }
+
+        var page = ParseCommitSummaries(log.StandardOutput);
+        if (page is null)
+        {
+            return CommitListResult.Failed(
+                CommitListFailure.GitError,
+                "Git 的提交列表输出无法解析，详情请查看日志。");
+        }
+
+        bool hasMore;
+        if (string.IsNullOrEmpty(search))
+        {
+            // 多读的那 1 条只用来探测下一页，不属于本页结果。
+            hasMore = page.Count > query.Limit;
+            if (hasMore)
+            {
+                page = [.. page.Take(query.Limit)];
+            }
+        }
+        else
+        {
+            // 有过滤词：全量读取（受扫描上限保护）后在内存按「哈希 / 信息 / 作者」三字段过滤
+            // （共用 CommitSearchFilter——与界面输入即刻的渐进过滤是同一份实现），
+            // 再在过滤后的结果集上切片，分页对调用方透明。
+            var matchedAll = CommitSearchFilter.Filter(page, search);
+            hasMore = matchedAll.Count > query.Offset + query.Limit;
+            page = [.. matchedAll.Skip(query.Offset).Take(query.Limit)];
+        }
+
+        _logger.Information(
+            "提交列表读取完成：{RepositoryPath} @ {Reference}（本页 {Count} 条{SearchNote}）",
+            repositoryPath,
+            reference,
+            page.Count,
+            string.IsNullOrEmpty(search) ? string.Empty : $"，过滤词「{search}」");
+
+        return CommitListResult.Succeeded(page, hasMore);
+    }
+
+    /// <inheritdoc />
+    public async Task<CommitDetailResult> GetCommitDetailAsync(
+        string repositoryPath,
+        string hash,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(repositoryPath);
+        ArgumentException.ThrowIfNullOrWhiteSpace(hash);
+
+        if (!Directory.Exists(repositoryPath))
+        {
+            _logger.Warning("读取提交详情失败，目录不存在：{RepositoryPath}", repositoryPath);
+            return CommitDetailResult.Failed(
+                CommitListFailure.DirectoryNotFound,
+                $"仓库目录不存在：{repositoryPath}");
+        }
+
+        var status = await _gitEnvironment.GetStatusAsync(cancellationToken).ConfigureAwait(false);
+        if (!status.IsAvailable || status.ExecutablePath is not { } gitPath)
+        {
+            return CommitDetailResult.Failed(
+                CommitListFailure.GitUnavailable,
+                "Git 尚未就绪，无法读取提交详情：请先按首页引导安装或配置 Git。");
+        }
+
+        // 第一步：提交元数据。-s 只要信息不出 diff；%B 是完整信息（含标题后的正文与换行），
+        // 放在最后一个字段，它的内部换行不会破坏前六个字段的 NUL 切分。
+        var metadata = await RunGitAsync(
+            gitPath,
+            ["show", "-s", "--format=%H%x00%h%x00%s%x00%an%x00%aI%x00%P%x00%B", hash],
+            repositoryPath,
+            cancellationToken).ConfigureAwait(false);
+
+        if (!metadata.IsSuccess)
+        {
+            var failure = ClassifyCommitReadFailure(hash, metadata);
+            return CommitDetailResult.Failed(failure.Failure, failure.FailureMessage!, failure.TechnicalDetail);
+        }
+
+        var record = metadata.StandardOutput.TrimEnd('\n');
+        var fields = record.Split('\0', 7);
+        if (fields.Length != 7)
+        {
+            _logger.Warning("Git 的提交详情输出无法解析（字段数 {FieldCount}）：{Output}", fields.Length, record);
+            return CommitDetailResult.Failed(
+                CommitListFailure.GitError,
+                "Git 的提交详情输出无法解析，详情请查看日志。");
+        }
+
+        // 父提交：空格分隔的完整哈希；根提交为空字符串 → 空列表。
+        var parentHashes = fields[5]
+            .Split(' ', StringSplitOptions.RemoveEmptyEntries);
+
+        // 第二步：diffstat。合并提交的 git show 不含对第一父的 diff，
+        // 统一按「有父 → diff 第一父..提交，根提交 → show（相对空树）」取 numstat，自己汇总数字。
+        var numstatArguments = parentHashes.Length > 0
+            ? new[] { "diff", "--numstat", parentHashes[0], fields[0] }
+            : new[] { "show", "--numstat", "--format=", fields[0] };
+
+        var numstat = await RunGitAsync(gitPath, numstatArguments, repositoryPath, cancellationToken).ConfigureAwait(false);
+        if (!numstat.IsSuccess)
+        {
+            var stderr = numstat.StandardError.Trim();
+            _logger.Warning(
+                "Git 命令失败（退出码 {ExitCode}）：{CommandLine}；{StandardError}",
+                numstat.ExitCode,
+                numstat.Invocation.CommandLineText,
+                stderr);
+            return CommitDetailResult.Failed(
+                CommitListFailure.GitError,
+                $"读取提交的变更统计时 Git 返回错误（退出码 {numstat.ExitCode}），详情请查看日志。",
+                stderr);
+        }
+
+        var detail = new CommitDetail(
+            fields[0],
+            fields[1],
+            fields[2],
+            fields[6],
+            fields[3],
+            DateTimeOffset.Parse(fields[4], CultureInfo.InvariantCulture, DateTimeStyles.RoundtripKind),
+            parentHashes,
+            SummarizeNumstat(numstat.StandardOutput));
+
+        _logger.Information(
+            "提交详情读取完成：{RepositoryPath} @ {ShortHash}（父提交 {ParentCount} 个，{Files} 个文件）",
+            repositoryPath,
+            detail.ShortHash,
+            detail.ParentHashes.Count,
+            detail.DiffStat.FilesChanged);
+
+        return CommitDetailResult.Succeeded(detail);
+    }
+
+    /// <summary>把 numstat 输出汇总成 diffstat 数字：二进制行（"-" 占位）计入文件数但不计增删行数。</summary>
+    private static CommitDiffStat SummarizeNumstat(string output)
+    {
+        var filesChanged = 0;
+        var additions = 0;
+        var deletions = 0;
+        foreach (var line in output.Split('\n', StringSplitOptions.RemoveEmptyEntries))
+        {
+            var fields = line.Split('\t');
+            if (fields.Length < 2)
+            {
+                continue;
+            }
+
+            filesChanged++;
+            if (int.TryParse(fields[0], CultureInfo.InvariantCulture, out var added))
+            {
+                additions += added;
+            }
+
+            if (int.TryParse(fields[1], CultureInfo.InvariantCulture, out var deleted))
+            {
+                deletions += deleted;
+            }
+        }
+
+        return new CommitDiffStat(filesChanged, additions, deletions);
+    }
+
+    /// <summary>把 git log --format 的输出解析为提交摘要列表；出现异常形态（字段数不对）时返回 null。</summary>
+    private List<CommitSummary>? ParseCommitSummaries(string output)
+    {
+        var commits = new List<CommitSummary>();
+        foreach (var line in output.Split('\n', StringSplitOptions.RemoveEmptyEntries))
+        {
+            var fields = line.Split('\0');
+            if (fields.Length != 4)
+            {
+                _logger.Warning("Git 的提交列表输出无法解析（字段数 {FieldCount}）：{Line}", fields.Length, line);
+                return null;
+            }
+
+            commits.Add(new CommitSummary(
+                fields[0],
+                fields[1],
+                fields[2],
+                DateTimeOffset.Parse(fields[3], CultureInfo.InvariantCulture, DateTimeStyles.RoundtripKind)));
+        }
+
+        return commits;
+    }
+
+    /// <summary>
+    /// 把提交列表 / 详情读取的失败归类：引用不存在（分支被删、哈希打错）单独提示，
+    /// 其余按 Git 错误透出技术细节。
+    /// </summary>
+    private CommitListResult ClassifyCommitReadFailure(string reference, GitCommandResult result)
+    {
+        var stderr = result.StandardError.Trim();
+
+        // 「引用不存在」的两种 Git 报法：短名解析不了是 unknown revision，
+        // 完整哈希查无此对象是 bad object——对用户是同一件事：找不到这个提交。
+        if (stderr.Contains("unknown revision", StringComparison.OrdinalIgnoreCase) ||
+            stderr.Contains("bad object", StringComparison.OrdinalIgnoreCase) ||
+            stderr.Contains("ambiguous argument", StringComparison.OrdinalIgnoreCase))
+        {
+            _logger.Warning("读取提交失败，引用不存在：{Reference}", reference);
+            return CommitListResult.Failed(
+                CommitListFailure.UnknownReference,
+                $"找不到提交「{reference}」：该分支或提交哈希在当前仓库中不存在。",
+                stderr);
+        }
+
+        _logger.Warning(
+            "Git 命令失败（退出码 {ExitCode}）：{CommandLine}；{StandardError}",
+            result.ExitCode,
+            result.Invocation.CommandLineText,
+            stderr);
+
+        return CommitListResult.Failed(
+            CommitListFailure.GitError,
+            $"读取提交时 Git 返回错误（退出码 {result.ExitCode}），详情请查看日志。",
+            stderr);
+    }
+
+    /// <summary>
+    /// 搜索时的全量读取扫描上限：保护内存不被异常巨大的仓库耗尽（交付场景的仓库远小于此）。
+    /// 超出上限的历史不参与过滤，界面上的搜索结果可能不完整。
+    /// </summary>
+    private const int MaxScanCommitCount = 100_000;
+
     /// <summary>
     /// 取某个引用最新提交的摘要（与分支列表同一组字段）；失败时返回 <see langword="null"/> 并记日志。
     /// 用于游离头指针——它不是任何 ref，for-each-ref 枚举不到，需单独按 HEAD 取。
