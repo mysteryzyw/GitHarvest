@@ -19,6 +19,16 @@ internal static class TestGit
         => new(ExecutablePath, [.. arguments], workingDirectory);
 
     /// <summary>
+    /// 执行一条 git 命令并要求成功；失败时抛出带退出码与 stderr 的 <see cref="GitCommandException"/>，
+    /// 让造仓库/改仓库状态的测试现场可直接诊断。这是各测试类执行 git 命令的统一入口。
+    /// </summary>
+    public static async Task RunAsync(IEnumerable<string> arguments, string? workingDirectory = null)
+    {
+        var result = await new GitCliRunner().RunAsync(Invocation(arguments, workingDirectory));
+        result.EnsureSuccess();
+    }
+
+    /// <summary>
     /// 在指定目录下造一个名为 git.exe 但不是可执行文件的占位文件：路径存在，启动进程必然失败。
     /// 用来验证「找到了 git.exe 却不可执行」的分支，返回它的完整路径。
     /// </summary>

@@ -28,7 +28,7 @@ public sealed class GitServiceTests : IDisposable
         Assert.Equal("main", repository.CurrentBranch);
         Assert.Equal(3, repository.CommitCount);
         // 仓库根应等于造出来的仓库目录（git 的正斜杠输出已由实现归一化，这里再忽略大小写兜底）。
-        Assert.Equal(NormalizePath(repositoryPath), NormalizePath(repository.RootPath), ignoreCase: true);
+        Assert.Equal(TestPaths.Normalize(repositoryPath), TestPaths.Normalize(repository.RootPath), ignoreCase: true);
     }
 
     [Fact]
@@ -41,7 +41,7 @@ public sealed class GitServiceTests : IDisposable
         var result = await CreateService().OpenRepositoryAsync(subdirectory);
 
         Assert.True(result.IsSuccess);
-        Assert.Equal(NormalizePath(repositoryPath), NormalizePath(result.Repository!.RootPath), ignoreCase: true);
+        Assert.Equal(TestPaths.Normalize(repositoryPath), TestPaths.Normalize(result.Repository!.RootPath), ignoreCase: true);
     }
 
     [Fact]
@@ -55,7 +55,7 @@ public sealed class GitServiceTests : IDisposable
         Assert.True(result.Repository!.IsBare);
         // bare 仓库的 HEAD 符号引用仍指向一个分支，仓库根就是仓库目录本身。
         Assert.Equal("main", result.Repository.CurrentBranch);
-        Assert.Equal(NormalizePath(repositoryPath), NormalizePath(result.Repository.RootPath), ignoreCase: true);
+        Assert.Equal(TestPaths.Normalize(repositoryPath), TestPaths.Normalize(result.Repository.RootPath), ignoreCase: true);
     }
 
     [Fact]
@@ -112,7 +112,7 @@ public sealed class GitServiceTests : IDisposable
     public async Task 游离头指针时当前分支为空()
     {
         var repositoryPath = await CreateRepositoryAsync("detached", commitCount: 2);
-        await RunGitAsync(["checkout", "-q", "--detach", "HEAD~1"], repositoryPath);
+        await TestGit.RunAsync(["checkout", "-q", "--detach", "HEAD~1"], repositoryPath);
 
         var result = await CreateService().OpenRepositoryAsync(repositoryPath);
 
@@ -143,7 +143,7 @@ public sealed class GitServiceTests : IDisposable
         var result = await CreateService().OpenRepositoryAsync(repositoryPath);
 
         Assert.True(result.IsSuccess);
-        Assert.Equal(NormalizePath(repositoryPath), NormalizePath(result.Repository!.RootPath), ignoreCase: true);
+        Assert.Equal(TestPaths.Normalize(repositoryPath), TestPaths.Normalize(result.Repository!.RootPath), ignoreCase: true);
     }
 
     [Fact]
@@ -164,54 +164,9 @@ public sealed class GitServiceTests : IDisposable
         new GitCliRunner(),
         SilentLogger);
 
-    /// <summary>
-    /// 在临时目录下造一个形态可配的仓库：<paramref name="commitCount"/> 为 0 时是空仓库；
-    /// <paramref name="bare"/> 为真时先造普通仓库再 <c>clone --bare</c>
-    /// （bare 仓库没有工作区，不能直接 commit），返回 bare 仓库目录。
-    /// </summary>
-    private async Task<string> CreateRepositoryAsync(string name, int commitCount, bool bare = false)
-    {
-        var repositoryPath = Path.Combine(_directory.Path, name);
-
-        if (bare)
-        {
-            // bare 仓库没有工作区不能 commit：先在工作仓库凑够提交，
-            // 再克隆成 bare 形态，随后删掉工作仓库只留 bare 仓库。
-            var workingPath = repositoryPath + ".work";
-            await RunGitAsync(["init", "-q", "-b", "main", workingPath]);
-            for (var index = 1; index <= commitCount; index++)
-            {
-                await RunGitAsync(["-C", workingPath, "commit", "-q", "--allow-empty", "-m", $"第 {index} 个提交"]);
-            }
-
-            await RunGitAsync(["clone", "-q", "--bare", workingPath, repositoryPath]);
-            TestDirectory.DeleteDirectory(workingPath);
-            return repositoryPath;
-        }
-
-        Directory.CreateDirectory(repositoryPath);
-        await RunGitAsync(["init", "-q", "-b", "main", repositoryPath]);
-        for (var index = 1; index <= commitCount; index++)
-        {
-            await File.WriteAllTextAsync(
-                Path.Combine(repositoryPath, $"file-{index}.txt"),
-                $"第 {index} 个提交的内容");
-            await RunGitAsync(["add", "."], repositoryPath);
-            await RunGitAsync(["commit", "-q", "-m", $"第 {index} 个提交"], repositoryPath);
-        }
-
-        return repositoryPath;
-    }
-
-    private static async Task RunGitAsync(IReadOnlyList<string> arguments, string? workingDirectory = null)
-    {
-        var runner = new GitCliRunner();
-        var result = await runner.RunAsync(TestGit.Invocation(arguments, workingDirectory));
-        result.EnsureSuccess();
-    }
-
-    /// <summary>git 返回的路径是正斜杠风格；断言前统一成 Windows 风格，避免分隔符差异干扰等值判断。</summary>
-    private static string NormalizePath(string path) => System.IO.Path.GetFullPath(path).TrimEnd('\\');
+    /// <summary>在测试目录下造一个形态可配的仓库（共享辅助见 <see cref="TestRepository"/>）。</summary>
+    private Task<string> CreateRepositoryAsync(string name, int commitCount, bool bare = false)
+        => TestRepository.CreateAsync(_directory.Path, name, commitCount, bare);
 
     /// <summary>环境自检桩：跳过探测直接返回给定状态，让 GitService 拿到本机真实 git.exe 的路径。</summary>
     private sealed class StubGitEnvironment(GitEnvironmentStatus status) : IGitEnvironmentService
