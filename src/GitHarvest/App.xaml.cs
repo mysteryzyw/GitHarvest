@@ -92,6 +92,9 @@ public partial class App : Application
         // 壳向 ViewModel 提供的交互接缝：文件夹选择对话框（接口定义在 Core，见 IFolderPicker）
         services.AddSingleton<IFolderPicker, FolderPicker>();
 
+        // 当前打开的仓库会话状态（ticket 06：仓库页写入，选择提交等后续步骤读取）
+        services.AddSingleton<IRepositorySession, RepositorySession>();
+
         // 外壳与导航
         services.AddSingleton<ShellViewModel>();
         services.AddSingleton<WpfShellNavigator>();
@@ -101,6 +104,7 @@ public partial class App : Application
         // 页面与页面级 ViewModel：由 WpfUI 的导航在切换时从容器解析（页面只声明带依赖的构造函数）
         services.AddTransient<RepositoryViewModel>();
         services.AddTransient<RepositoryPage>();
+        services.AddTransient<PickCommitsViewModel>();
         services.AddTransient<PickCommitsPage>();
         services.AddTransient<PreviewPage>();
         services.AddTransient<NotesPage>();

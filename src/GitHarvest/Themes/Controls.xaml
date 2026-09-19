@@ -329,6 +329,129 @@
         </Style.Triggers>
     </Style>
 
+    <!-- 成功横幅（与 AppErrorBanner 同构：ok 底 + 25% ok 描边，原型 .banner.ok） -->
+    <Style x:Key="AppSuccessBanner" TargetType="Border">
+        <Setter Property="Background" Value="{StaticResource AppSuccessSoftBrush}" />
+        <Setter Property="BorderBrush" Value="#40107C10" />
+        <Setter Property="BorderThickness" Value="1" />
+        <Setter Property="CornerRadius" Value="8" />
+        <Setter Property="Padding" Value="14,11" />
+        <Setter Property="SnapsToDevicePixels" Value="True" />
+    </Style>
+
+    <Style x:Key="AppSuccessText" TargetType="TextBlock">
+        <Setter Property="FontFamily" Value="{StaticResource AppFontFamily}" />
+        <Setter Property="FontSize" Value="13" />
+        <Setter Property="LineHeight" Value="19" />
+        <Setter Property="Foreground" Value="#FF0B5D0B" />
+        <Setter Property="TextWrapping" Value="Wrap" />
+        <Setter Property="VerticalAlignment" Value="Center" />
+    </Style>
+
+    <!-- ==================== 分支下拉（原型 .combobox / .combo-menu / .combo-item） ==================== -->
+    <!--
+        原型 .combobox：高 32、padding 0 10 0 12、control 底色、1px 描边（底边更深）、圆角 4、
+        悬停白底。WpfUI 没有对应控件，用 ToggleButton 自写模板（IsChecked 驱动 Popup 开合）。
+        底边单独画一条深色边：Fluent 输入控件族的特征（与 .textbox 的 border-bottom 一致）。
+    -->
+    <Style x:Key="AppComboBoxButton" TargetType="ToggleButton">
+        <Setter Property="FontFamily" Value="{StaticResource AppFontFamily}" />
+        <Setter Property="FontSize" Value="13" />
+        <Setter Property="Height" Value="32" />
+        <Setter Property="Padding" Value="12,0,10,0" />
+        <Setter Property="Cursor" Value="Hand" />
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="ToggleButton">
+                    <Border
+                        x:Name="Chrome"
+                        Background="{DynamicResource ControlFillColorDefaultBrush}"
+                        BorderBrush="{DynamicResource ControlStrokeColorDefaultBrush}"
+                        BorderThickness="1"
+                        CornerRadius="{StaticResource ControlCornerRadius}"
+                        Padding="{TemplateBinding Padding}"
+                        SnapsToDevicePixels="True">
+                        <Grid>
+                            <Border
+                                Height="1"
+                                Margin="1,0"
+                                VerticalAlignment="Bottom"
+                                Background="{DynamicResource ControlStrokeColorSecondaryBrush}" />
+                            <ContentPresenter
+                                HorizontalAlignment="Left"
+                                VerticalAlignment="Center"
+                                RecognizesAccessKey="True" />
+                        </Grid>
+                    </Border>
+                    <ControlTemplate.Triggers>
+                        <Trigger Property="IsMouseOver" Value="True">
+                            <Setter TargetName="Chrome" Property="Background" Value="#FFFFFFFF" />
+                        </Trigger>
+                        <Trigger Property="IsChecked" Value="True">
+                            <Setter TargetName="Chrome" Property="Background" Value="#FFFFFFFF" />
+                        </Trigger>
+                        <Trigger Property="IsEnabled" Value="False">
+                            <Setter TargetName="Chrome" Property="Opacity" Value="0.5" />
+                        </Trigger>
+                    </ControlTemplate.Triggers>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+    <!--
+        下拉菜单卡片（原型 .combo-menu：#FDFDFD 底、1px 卡描边、圆角 8、0 12 28 .16 投影）。
+        内边距取 6（原型 4）：菜单里有输入控件，聚焦外框与描边需要一点余量，贴边会被看成被裁切。
+        投影复用浮起操作条的 AppBarShadowEffect（同为「浮在页面上方」语义）。
+    -->
+    <Style x:Key="AppComboMenu" TargetType="Border">
+        <Setter Property="Background" Value="{StaticResource AppRaisedCardBackgroundBrush}" />
+        <Setter Property="BorderBrush" Value="{StaticResource AppCardBorderBrush}" />
+        <Setter Property="BorderThickness" Value="1" />
+        <Setter Property="CornerRadius" Value="{StaticResource CardCornerRadius}" />
+        <Setter Property="Padding" Value="6" />
+        <Setter Property="Effect" Value="{StaticResource AppBarShadowEffect}" />
+        <Setter Property="SnapsToDevicePixels" Value="True" />
+    </Style>
+
+    <!--
+        菜单项（原型 .combo-item：padding 7 10、圆角 4、悬停 8% 强调色底）。
+        内容是两行（名称 + 摘要），由页面 DataTemplate 提供，模板只管外壳与悬停。
+    -->
+    <Style x:Key="AppComboMenuItem" TargetType="Button">
+        <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+        <Setter Property="Padding" Value="10,7" />
+        <Setter Property="Cursor" Value="Hand" />
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="Button">
+                    <Border
+                        x:Name="Chrome"
+                        Background="Transparent"
+                        CornerRadius="{StaticResource ControlCornerRadius}"
+                        Padding="{TemplateBinding Padding}">
+                        <ContentPresenter
+                            HorizontalAlignment="{TemplateBinding HorizontalContentAlignment}"
+                            VerticalAlignment="Center" />
+                    </Border>
+                    <ControlTemplate.Triggers>
+                        <Trigger Property="IsMouseOver" Value="True">
+                            <Setter TargetName="Chrome" Property="Background" Value="#140067C0" />
+                        </Trigger>
+                    </ControlTemplate.Triggers>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+    <!-- 组标题（「本地分支」「远程分支」：11px 三级色，原型无此元素，取 .combo-item .sub 同族规格） -->
+    <Style x:Key="AppComboGroupHeader" TargetType="TextBlock">
+        <Setter Property="FontFamily" Value="{StaticResource AppFontFamily}" />
+        <Setter Property="FontSize" Value="11" />
+        <Setter Property="Foreground" Value="{DynamicResource TextFillColorTertiaryBrush}" />
+        <Setter Property="Margin" Value="10,8,10,4" />
+    </Style>
+
     <!-- ==================== 左侧导航项（原型 .nav-item） ==================== -->
     <!--
         WpfUI 自带的项模板（NavigationViewCompact.xaml 的 LeftCompactNavigationViewItemTemplate）

@@ -125,6 +125,217 @@ public sealed class GitService : IGitService
         return RepositoryOpenResult.Succeeded(repository);
     }
 
+    /// <inheritdoc />
+    public async Task<BranchListResult> GetBranchesAsync(
+        string repositoryPath,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(repositoryPath);
+
+        if (!Directory.Exists(repositoryPath))
+        {
+            _logger.Warning("读取分支列表失败，目录不存在：{RepositoryPath}", repositoryPath);
+            return BranchListResult.Failed(
+                BranchListFailure.DirectoryNotFound,
+                $"仓库目录不存在：{repositoryPath}");
+        }
+
+        var status = await _gitEnvironment.GetStatusAsync(cancellationToken).ConfigureAwait(false);
+        if (!status.IsAvailable || status.ExecutablePath is not { } gitPath)
+        {
+            return BranchListResult.Failed(
+                BranchListFailure.GitUnavailable,
+                "Git 尚未就绪，无法读取分支列表：请先按首页引导安装或配置 Git。");
+        }
+
+        // 第一步：是否游离头指针。symbolic-ref -q HEAD 在分支上时成功并输出引用全名，游离时退出码 1。
+        var head = await RunGitAsync(
+            gitPath, ["symbolic-ref", "-q", "HEAD"], repositoryPath, cancellationToken).ConfigureAwait(false);
+
+        // 第二步：枚举本地（refs/heads）与远程跟踪（refs/remotes）引用。
+        // 字段间用 %00（NUL）分隔：字段值不可能含 NUL，%(subject) 只是信息首行也不含换行，
+        // 所以按行切记录、按 NUL 切字段即可；NUL 同时意味着中文分支名与提交信息不做转义。
+        const string format =
+            "%(refname)%00%(refname:short)%00%(objectname:short)%00%(subject)%00" +
+            "%(authorname)%00%(authordate:iso-strict)%00%(HEAD)%00%(symref)";
+        var refs = await RunGitAsync(
+            gitPath,
+            ["for-each-ref", $"--format={format}", "refs/heads", "refs/remotes"],
+            repositoryPath,
+            cancellationToken).ConfigureAwait(false);
+
+        if (!refs.IsSuccess)
+        {
+            return BranchListResult.Failed(
+                BranchListFailure.GitError,
+                $"读取分支列表时 Git 返回错误（退出码 {refs.ExitCode}），详情请查看日志。",
+                LogGitFailure(refs));
+        }
+
+        var branches = new List<BranchInfo>();
+        foreach (var line in refs.StandardOutput.Split('\n', StringSplitOptions.RemoveEmptyEntries))
+        {
+            var fields = line.Split('\0');
+            if (fields.Length != 8)
+            {
+                _logger.Warning("Git 的分支引用输出无法解析（字段数 {FieldCount}）：{Line}", fields.Length, line);
+                return BranchListResult.Failed(
+                    BranchListFailure.GitError,
+                    "Git 的分支列表输出无法解析，详情请查看日志。",
+                    line);
+            }
+
+            // symref 非空的是 origin/HEAD 这类符号引用——它只是「远程默认分支」的别名，
+            // 不是独立候选，否则列表里会出现一行意义不明的 origin/HEAD。
+            if (fields[7].Length > 0)
+            {
+                continue;
+            }
+
+            var tip = new CommitSummary(
+                fields[2],
+                fields[3],
+                fields[4],
+                DateTimeOffset.Parse(fields[5], CultureInfo.InvariantCulture, DateTimeStyles.RoundtripKind));
+
+            branches.Add(new BranchInfo(
+                fields[1],
+                IsRemote: fields[0].StartsWith("refs/remotes/", StringComparison.Ordinal),
+                IsCurrent: fields[6] == "*",
+                IsDetached: false,
+                tip));
+        }
+
+        // 游离头指针不是分支，但它是合法的「基准位置」：补一个候选项放在列表最前，
+        // 由界面标注「（游离）」（用户故事：不丢失这个状态）。
+        if (!head.IsSuccess)
+        {
+            if (await ReadTipAsync(gitPath, repositoryPath, "HEAD", cancellationToken).ConfigureAwait(false)
+                is not { } detachedTip)
+            {
+                return BranchListResult.Failed(
+                    BranchListFailure.GitError,
+                    "读取游离头指针的提交摘要时 Git 返回错误，详情请查看日志。",
+                    null);
+            }
+
+            branches.Insert(0, new BranchInfo("HEAD", IsRemote: false, IsCurrent: false, IsDetached: true, detachedTip));
+        }
+
+        _logger.Information(
+            "分支列表读取完成：{RepositoryPath}（{BranchCount} 个候选{DetachedNote}）",
+            repositoryPath,
+            branches.Count,
+            head.IsSuccess ? string.Empty : "，含游离头指针");
+
+        return BranchListResult.Succeeded(branches);
+    }
+
+    /// <inheritdoc />
+    public async Task<FetchResult> FetchAsync(
+        string repositoryPath,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(repositoryPath);
+
+        if (!Directory.Exists(repositoryPath))
+        {
+            _logger.Warning("拉取失败，目录不存在：{RepositoryPath}", repositoryPath);
+            return FetchResult.Failed(
+                FetchFailure.DirectoryNotFound,
+                $"仓库目录不存在：{repositoryPath}");
+        }
+
+        var status = await _gitEnvironment.GetStatusAsync(cancellationToken).ConfigureAwait(false);
+        if (!status.IsAvailable || status.ExecutablePath is not { } gitPath)
+        {
+            return FetchResult.Failed(
+                FetchFailure.GitUnavailable,
+                "Git 尚未就绪，无法拉取：请先按首页引导安装或配置 Git。");
+        }
+
+        // 没有配置远程的仓库无从拉取——这不是崩溃，给明确结果让界面解释。
+        var remotes = await RunGitAsync(gitPath, ["remote"], repositoryPath, cancellationToken).ConfigureAwait(false);
+        if (!remotes.IsSuccess)
+        {
+            return FetchResult.Failed(
+                FetchFailure.GitError,
+                $"查询远程列表时 Git 返回错误（退出码 {remotes.ExitCode}），详情请查看日志。",
+                LogGitFailure(remotes));
+        }
+
+        if (remotes.StandardOutput.Trim().Length == 0)
+        {
+            _logger.Information("拉取跳过，仓库没有配置远程：{RepositoryPath}", repositoryPath);
+            return FetchResult.Failed(
+                FetchFailure.NoRemote,
+                "该仓库没有配置远程，没有可拉取的内容。");
+        }
+
+        // spec 的「拉取」语义：git fetch 只更新远程跟踪分支，不 merge、不动工作区。
+        // 需要凭据的远程会因 GIT_TERMINAL_PROMPT=0 即时失败（不弹凭据界面卡死），按 Git 错误处理。
+        var fetch = await RunGitAsync(gitPath, ["fetch"], repositoryPath, cancellationToken).ConfigureAwait(false);
+        if (!fetch.IsSuccess)
+        {
+            return FetchResult.Failed(
+                FetchFailure.GitError,
+                $"拉取远程更新时 Git 返回错误（退出码 {fetch.ExitCode}），详情请查看日志。",
+                LogGitFailure(fetch));
+        }
+
+        _logger.Information("拉取完成，远程跟踪分支已更新：{RepositoryPath}", repositoryPath);
+        return FetchResult.Succeeded();
+    }
+
+    /// <summary>
+    /// 取某个引用最新提交的摘要（与分支列表同一组字段）；失败时返回 <see langword="null"/> 并记日志。
+    /// 用于游离头指针——它不是任何 ref，for-each-ref 枚举不到，需单独按 HEAD 取。
+    /// </summary>
+    private async Task<CommitSummary?> ReadTipAsync(
+        string gitPath,
+        string repositoryPath,
+        string reference,
+        CancellationToken cancellationToken)
+    {
+        var tip = await RunGitAsync(
+            gitPath,
+            ["log", "-1", "--format=%h%x00%s%x00%an%x00%aI", reference],
+            repositoryPath,
+            cancellationToken).ConfigureAwait(false);
+
+        if (!tip.IsSuccess)
+        {
+            LogGitFailure(tip);
+            return null;
+        }
+
+        var fields = tip.StandardOutput.TrimEnd('\n').Split('\0');
+        if (fields.Length != 4)
+        {
+            _logger.Warning("Git 的提交摘要输出无法解析（字段数 {FieldCount}）：{Output}", fields.Length, tip.StandardOutput);
+            return null;
+        }
+
+        return new CommitSummary(
+            fields[0],
+            fields[1],
+            fields[2],
+            DateTimeOffset.Parse(fields[3], CultureInfo.InvariantCulture, DateTimeStyles.RoundtripKind));
+    }
+
+    /// <summary>把一次失败的 git 调用写入日志（退出码 + 命令行 + stderr），返回 stderr 摘要供结果对象携带。</summary>
+    private string LogGitFailure(GitCommandResult result)
+    {
+        var stderr = result.StandardError.Trim();
+        _logger.Warning(
+            "Git 命令失败（退出码 {ExitCode}）：{CommandLine}；{StandardError}",
+            result.ExitCode,
+            result.Invocation.CommandLineText,
+            stderr);
+
+        return stderr;
+    }
+
     /// <summary>
     /// 把「是否仓库」探测的失败归类：目录不存在与「不是仓库」分别提示，
     /// 其余按 Git 错误透出技术细节（写入日志便于排查）。
@@ -156,19 +367,10 @@ public sealed class GitService : IGitService
 
     /// <summary>无法归类的 Git 错误：界面给出通用提示，stderr 完整进日志。</summary>
     private RepositoryOpenResult UnknownGitError(GitCommandResult result)
-    {
-        var stderr = result.StandardError.Trim();
-        _logger.Warning(
-            "Git 命令失败（退出码 {ExitCode}）：{CommandLine}；{StandardError}",
-            result.ExitCode,
-            result.Invocation.CommandLineText,
-            stderr);
-
-        return RepositoryOpenResult.Failed(
+        => RepositoryOpenResult.Failed(
             RepositoryOpenFailure.GitError,
             $"打开仓库时 Git 返回错误（退出码 {result.ExitCode}），详情请查看日志。",
-            stderr);
-    }
+            LogGitFailure(result));
 
     private Task<GitCommandResult> RunGitAsync(
         string gitPath,

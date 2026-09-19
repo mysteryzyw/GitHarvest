@@ -21,6 +21,7 @@ public sealed partial class RepositoryViewModel : ObservableObject
     private readonly ISettingsService _settings;
     private readonly IFolderPicker _folderPicker;
     private readonly IShellNavigator _navigator;
+    private readonly IRepositorySession _session;
 
     /// <param name="shell">外壳状态，页面标题等仍由它提供。</param>
     /// <param name="gitEnvironment">git 环境自检（结果缓存，重复询问不会反复启动进程）。</param>
@@ -28,13 +29,15 @@ public sealed partial class RepositoryViewModel : ObservableObject
     /// <param name="settings">最近仓库列表与全局设置的来源。</param>
     /// <param name="folderPicker">文件夹选择对话框（壳实现）。</param>
     /// <param name="navigator">用于跳到「全局设置」与「选择提交」。</param>
+    /// <param name="session">当前仓库会话状态：打开成功后写入，供选择提交等后续步骤读取。</param>
     public RepositoryViewModel(
         ShellViewModel shell,
         IGitEnvironmentService gitEnvironment,
         IGitService gitService,
         ISettingsService settings,
         IFolderPicker folderPicker,
-        IShellNavigator navigator)
+        IShellNavigator navigator,
+        IRepositorySession session)
     {
         ArgumentNullException.ThrowIfNull(shell);
         ArgumentNullException.ThrowIfNull(gitEnvironment);
@@ -42,6 +45,7 @@ public sealed partial class RepositoryViewModel : ObservableObject
         ArgumentNullException.ThrowIfNull(settings);
         ArgumentNullException.ThrowIfNull(folderPicker);
         ArgumentNullException.ThrowIfNull(navigator);
+        ArgumentNullException.ThrowIfNull(session);
 
         Shell = shell;
         _gitEnvironment = gitEnvironment;
@@ -49,6 +53,7 @@ public sealed partial class RepositoryViewModel : ObservableObject
         _settings = settings;
         _folderPicker = folderPicker;
         _navigator = navigator;
+        _session = session;
 
         ReloadRecentRepositories();
     }
@@ -165,6 +170,7 @@ public sealed partial class RepositoryViewModel : ObservableObject
             }
 
             OpenedRepository = repository;
+            _session.OpenedRepository = repository;
             _settings.AddRecentRepository(repository.RootPath);
             ReloadRecentRepositories();
             OnPropertyChanged(nameof(RecentCountDisplay));

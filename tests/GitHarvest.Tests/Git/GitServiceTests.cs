@@ -124,10 +124,7 @@ public sealed class GitServiceTests : IDisposable
     public async Task git不可用时返回不可用失败而不是抛出()
     {
         var repositoryPath = await CreateRepositoryAsync("normal", commitCount: 1);
-        var service = new GitService(
-            new StubGitEnvironment(GitEnvironmentStatus.NotRunnable()),
-            new GitCliRunner(),
-            SilentLogger);
+        var service = new GitService(StubGitEnvironment.NotRunnable(), new GitCliRunner(), SilentLogger);
 
         var result = await service.OpenRepositoryAsync(repositoryPath);
 
@@ -158,23 +155,10 @@ public sealed class GitServiceTests : IDisposable
     public void Dispose() => _directory.Dispose();
 
     /// <summary>用本机真实 git.exe 构造被测服务（环境自检桩直接给出可用状态，不走探测）。</summary>
-    private static GitService CreateService() => new(
-        new StubGitEnvironment(
-            GitEnvironmentStatus.Available(TestGit.ExecutablePath, "test", GitExecutableSource.PathEnvironment)),
-        new GitCliRunner(),
-        SilentLogger);
+    private static GitService CreateService()
+        => new(StubGitEnvironment.Available(), new GitCliRunner(), SilentLogger);
 
     /// <summary>在测试目录下造一个形态可配的仓库（共享辅助见 <see cref="TestRepository"/>）。</summary>
     private Task<string> CreateRepositoryAsync(string name, int commitCount, bool bare = false)
         => TestRepository.CreateAsync(_directory.Path, name, commitCount, bare);
-
-    /// <summary>环境自检桩：跳过探测直接返回给定状态，让 GitService 拿到本机真实 git.exe 的路径。</summary>
-    private sealed class StubGitEnvironment(GitEnvironmentStatus status) : IGitEnvironmentService
-    {
-        public Task<GitEnvironmentStatus> GetStatusAsync(CancellationToken cancellationToken = default)
-            => Task.FromResult(status);
-
-        public Task<GitEnvironmentStatus> RefreshAsync(CancellationToken cancellationToken = default)
-            => Task.FromResult(status);
-    }
 }

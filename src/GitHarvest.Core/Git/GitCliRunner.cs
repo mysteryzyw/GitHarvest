@@ -10,6 +10,7 @@ namespace GitHarvest.Core.Git;
 /// 统一约定：
 /// <list type="bullet">
 ///   <item>环境变量 <c>LC_ALL=C</c>：锁定输出语言，git 的报错与提示始终是英文，可被程序判断。</item>
+///   <item>环境变量 <c>GIT_TERMINAL_PROMPT=0</c>：禁止终端凭据提示，需要凭据时即时失败而非弹 GUI 卡死。</item>
 ///   <item>标准输出/错误一律按 UTF-8 解码：中文路径与提交信息不会乱码；
 ///     非 ASCII 路径的转义问题由调用方加 <c>-z</c> 规避（<see cref="GitCommandResult.GetNulSeparatedRecords"/>）。</item>
 ///   <item>退出码与 stderr 收敛到 <see cref="GitCommandResult"/>，失败用 <see cref="GitCommandResult.EnsureSuccess"/> 抛出。</item>
@@ -63,6 +64,11 @@ public sealed class GitCliRunner
         }
 
         startInfo.Environment["LC_ALL"] = LocaleValue;
+
+        // 禁止 git 在终端里询问凭据或确认：碰到需要凭据的远程（fetch 等场景）即时失败，
+        // 而不是让 Git Credential Manager 弹出 GUI 把后台流程卡死（ticket 02 定下的交接项，
+        // 对所有调用统一生效——本地操作本就不需要终端提示，禁用无副作用）。
+        startInfo.Environment["GIT_TERMINAL_PROMPT"] = "0";
 
         using var process = new Process { StartInfo = startInfo };
         try

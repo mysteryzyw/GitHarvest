@@ -21,4 +21,30 @@ public interface IGitService
     Task<RepositoryOpenResult> OpenRepositoryAsync(
         string repositoryPath,
         CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// 读取仓库的分支候选项：本地分支与远程跟踪分支（<see cref="BranchInfo.IsRemote"/> 区分），
+    /// 每项附带最新提交摘要；游离头指针时列表最前面有一个 <see cref="BranchInfo.IsDetached"/>
+    /// 候选项。空仓库（还没有任何提交）返回空列表而非失败。
+    /// </summary>
+    /// <param name="repositoryPath">仓库目录（仓库根或其子目录）。</param>
+    /// <param name="cancellationToken">取消令牌；取消时终止正在执行的 git 进程。</param>
+    /// <returns>读取结果；失败不抛异常，提示在结果里。</returns>
+    /// <exception cref="OperationCanceledException">令牌已取消，或执行过程中被取消。</exception>
+    Task<BranchListResult> GetBranchesAsync(
+        string repositoryPath,
+        CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// 「拉取」：执行 <c>git fetch</c>——只更新远程跟踪分支，不 merge、不动工作区。
+    /// 仓库没有配置远程时不是错误崩溃，而是 <see cref="FetchFailure.NoRemote"/> 的明确结果。
+    /// 成功后由调用方重新读取分支数据完成刷新。
+    /// </summary>
+    /// <param name="repositoryPath">仓库目录（仓库根或其子目录）。</param>
+    /// <param name="cancellationToken">取消令牌；取消时终止正在执行的 git 进程。</param>
+    /// <returns>拉取结果；失败不抛异常，提示在结果里。</returns>
+    /// <exception cref="OperationCanceledException">令牌已取消，或执行过程中被取消。</exception>
+    Task<FetchResult> FetchAsync(
+        string repositoryPath,
+        CancellationToken cancellationToken = default);
 }

@@ -2,9 +2,13 @@
     x:Class="GitHarvest.Views.PickCommitsPage"
     xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-    xmlns:controls="clr-namespace:GitHarvest.Controls">
+    xmlns:controls="clr-namespace:GitHarvest.Controls"
+    xmlns:ui="http://schemas.lepo.co/wpfui/2022/xaml">
 
-    <!-- 选择提交页（工作流第 2 步）。本 ticket 只放骨架占位，业务在 ticket 06、07 落地。 -->
+    <!--
+        选择提交页（工作流第 2 步）。ticket 06 落地顶部行：分支下拉（本地/远程分组、过滤、
+        游离标注、每分支提交摘要）+「拉取」按钮；基准/Head 双栏提交列表在 ticket 07。
+    -->
 
     <Grid>
         <Grid.RowDefinitions>
@@ -18,24 +22,323 @@
             VerticalScrollBarVisibility="Auto">
             <StackPanel Style="{StaticResource PageLayout}">
 
-                <TextBlock Style="{StaticResource PageTitleText}" Text="{Binding CurrentTitle}" />
-                <TextBlock Style="{StaticResource PageSubtitleText}" Text="选定基准提交与 Head 提交，确定变更范围（base..head）。" />
+                <!-- 顶部行（原型 .row：标题组在左，分支 combobox 与「拉取」在右，gap 10） -->
+                <Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="Auto" />
+                        <ColumnDefinition Width="Auto" />
+                    </Grid.ColumnDefinitions>
 
-                <controls:StepBar Margin="0,20,0,22" />
+                    <StackPanel Grid.Column="0" VerticalAlignment="Center">
+                        <TextBlock Style="{StaticResource PageTitleText}" Text="{Binding Shell.CurrentTitle}" />
+                        <TextBlock Style="{StaticResource PageSubtitleText}" Text="{Binding PageSubtitle}" />
+                    </StackPanel>
 
-                <Border Style="{StaticResource AppCard}">
+                    <!-- 分支下拉：自绘 combobox（WpfUI ComboBox 放不下过滤框与两行摘要项） -->
+                    <Grid
+                        Grid.Column="1"
+                        Margin="10,0,0,0"
+                        VerticalAlignment="Center">
+                        <ToggleButton
+                            x:Name="BranchComboButton"
+                            MinWidth="150"
+                            IsEnabled="{Binding HasRepository}"
+                            Style="{StaticResource AppComboBoxButton}">
+                            <StackPanel Orientation="Horizontal">
+                                <ui:SymbolIcon
+                                    FontSize="14"
+                                    Foreground="{StaticResource AppAccentBrush}"
+                                    Symbol="BranchFork24" />
+                                <TextBlock
+                                    Margin="8,0,0,0"
+                                    VerticalAlignment="Center"
+                                    FontSize="13"
+                                    Text="{Binding SelectedBranch.DisplayName, TargetNullValue=选择分支, FallbackValue=选择分支}" />
+                                <TextBlock
+                                    Margin="8,0,0,0"
+                                    VerticalAlignment="Center"
+                                    FontSize="10"
+                                    Foreground="{DynamicResource TextFillColorTertiaryBrush}"
+                                    Text="▾" />
+                            </StackPanel>
+                        </ToggleButton>
+
+                        <Popup
+                            AllowsTransparency="True"
+                            IsOpen="{Binding IsChecked, ElementName=BranchComboButton, Mode=TwoWay}"
+                            Placement="Bottom"
+                            PlacementTarget="{Binding ElementName=BranchComboButton}"
+                            StaysOpen="False">
+                            <!--
+                                菜单宽度：原型 .combo-menu 与按钮同宽（left/right -1px），但这里有过滤框，
+                                取最小 240 让过滤框有足够输入宽度、上限 360 让超长分支名截断而不是把菜单撑宽。
+                            -->
+                            <Border
+                                MinWidth="240"
+                                MaxWidth="360"
+                                Style="{StaticResource AppComboMenu}">
+                                <StackPanel>
+                                    <!--
+                                        过滤框（原型 combobox 无此元素，验收新增；视觉沿用 .textbox 族）。
+                                        不设固定高度、显式收小上下内边距：WpfUI 模板默认内边距上下合计 15px，
+                                        32 高时内容区只剩 15px，装不下 13px 字号的完整行高（~17px）——
+                                        表现为大写能显示、小写 g 的下伸部被裁（实机 125%/150% 缩放下更明显）。
+                                        这里给 10,5,10,5，内容区 ~18.5px 始终完整容纳字形（行高 ~17.2px），模板自然伸展高度。
+                                        焦点可视样式关掉：它画在控件外侧，在窄容器里会顶到菜单卡边缘被裁；
+                                        Fluent 的聚焦态（边框转强调色）已经足够指示焦点在哪。
+                                    -->
+                                    <ui:TextBox
+                                        Margin="0,0,0,6"
+                                        Padding="10,5,10,5"
+                                        FontSize="13"
+                                        FocusVisualStyle="{x:Null}"
+                                        VerticalContentAlignment="Center"
+                                        PlaceholderText="过滤分支"
+                                        Text="{Binding FilterText, UpdateSourceTrigger=PropertyChanged}">
+                                        <ui:TextBox.Icon>
+                                            <ui:SymbolIcon
+                                                FontSize="14"
+                                                Foreground="{DynamicResource TextFillColorTertiaryBrush}"
+                                                Symbol="Search24" />
+                                        </ui:TextBox.Icon>
+                                    </ui:TextBox>
+
+                                    <ScrollViewer MaxHeight="360" VerticalScrollBarVisibility="Auto">
+                                        <ItemsControl ItemsSource="{Binding BranchGroups}">
+                                            <ItemsControl.ItemTemplate>
+                                                <DataTemplate>
+                                                    <StackPanel>
+                                                        <TextBlock Style="{StaticResource AppComboGroupHeader}" Text="{Binding Title}" />
+                                                        <ItemsControl ItemsSource="{Binding Items}">
+                                                            <ItemsControl.ItemTemplate>
+                                                                <DataTemplate>
+                                                                    <Button
+                                                                        Click="OnBranchItemClick"
+                                                                        Command="{Binding DataContext.SelectBranchCommand, RelativeSource={RelativeSource AncestorType=Page}}"
+                                                                        CommandParameter="{Binding}"
+                                                                        Style="{StaticResource AppComboMenuItem}">
+                                                                        <Grid>
+                                                                            <Grid.ColumnDefinitions>
+                                                                                <ColumnDefinition Width="*" />
+                                                                                <ColumnDefinition Width="Auto" />
+                                                                            </Grid.ColumnDefinitions>
+
+                                                                            <!-- 只显示分支名（原型 .combo-item 的形态）；超长名截断而不是把菜单撑宽 -->
+                                                                            <TextBlock
+                                                                                Grid.Column="0"
+                                                                                VerticalAlignment="Center"
+                                                                                FontSize="13"
+                                                                                Text="{Binding DisplayName}"
+                                                                                TextTrimming="CharacterEllipsis" />
+
+                                                                            <!-- 选中勾（原型 .combo-item .tick） -->
+                                                                            <TextBlock
+                                                                                Grid.Column="1"
+                                                                                Margin="8,0,0,0"
+                                                                                VerticalAlignment="Center"
+                                                                                FontSize="12"
+                                                                                Foreground="{StaticResource AppAccentBrush}"
+                                                                                Text="✓">
+                                                                                <TextBlock.Style>
+                                                                                    <Style TargetType="TextBlock">
+                                                                                        <Setter Property="Visibility" Value="Collapsed" />
+                                                                                        <Style.Triggers>
+                                                                                            <DataTrigger Binding="{Binding IsSelected}" Value="True">
+                                                                                                <Setter Property="Visibility" Value="Visible" />
+                                                                                            </DataTrigger>
+                                                                                        </Style.Triggers>
+                                                                                    </Style>
+                                                                                </TextBlock.Style>
+                                                                            </TextBlock>
+                                                                        </Grid>
+                                                                    </Button>
+                                                                </DataTemplate>
+                                                            </ItemsControl.ItemTemplate>
+                                                        </ItemsControl>
+                                                    </StackPanel>
+                                                </DataTemplate>
+                                            </ItemsControl.ItemTemplate>
+                                        </ItemsControl>
+                                    </ScrollViewer>
+                                </StackPanel>
+                            </Border>
+                        </Popup>
+                    </Grid>
+
+                    <!--
+                        「拉取」（原型 .btn：refresh 图标 + 文字）。
+                        拉取进行中（IsBusy）时图标旋转：原型没有 loading 态，取同族刷新图标的
+                        0.8s/圈 匀速旋转示意进行中；文案由 FetchButtonText 同步变为「拉取中…」，
+                        命令 CanExecute（IsIdle）同时禁用按钮防重复提交。
+                    -->
+                    <ui:Button
+                        Grid.Column="2"
+                        Margin="10,0,0,0"
+                        Command="{Binding FetchCommand}"
+                        Content="{Binding FetchButtonText}"
+                        IsEnabled="{Binding HasRepository}"
+                        Style="{StaticResource AppSecondaryButton}">
+                        <ui:Button.Icon>
+                            <ui:SymbolIcon
+                                FontSize="14"
+                                RenderTransformOrigin="0.5,0.5"
+                                Symbol="ArrowSync24">
+                                <ui:SymbolIcon.Style>
+                                    <Style TargetType="ui:SymbolIcon">
+                                        <Setter Property="RenderTransform">
+                                            <Setter.Value>
+                                                <RotateTransform Angle="0" />
+                                            </Setter.Value>
+                                        </Setter>
+                                        <Style.Triggers>
+                                            <DataTrigger Binding="{Binding IsBusy}" Value="True">
+                                                <DataTrigger.EnterActions>
+                                                    <BeginStoryboard>
+                                                        <Storyboard>
+                                                            <DoubleAnimation
+                                                                Storyboard.TargetProperty="(UIElement.RenderTransform).(RotateTransform.Angle)"
+                                                                From="0"
+                                                                To="360"
+                                                                Duration="0:0:0.8"
+                                                                RepeatBehavior="Forever" />
+                                                        </Storyboard>
+                                                    </BeginStoryboard>
+                                                </DataTrigger.EnterActions>
+                                                <DataTrigger.ExitActions>
+                                                    <BeginStoryboard>
+                                                        <Storyboard>
+                                                            <!-- 结束即复位到 0：不转半圈定格，观感回到静止初始态。 -->
+                                                            <DoubleAnimation
+                                                                Storyboard.TargetProperty="(UIElement.RenderTransform).(RotateTransform.Angle)"
+                                                                To="0"
+                                                                Duration="0:0:0" />
+                                                        </Storyboard>
+                                                    </BeginStoryboard>
+                                                </DataTrigger.ExitActions>
+                                            </DataTrigger>
+                                        </Style.Triggers>
+                                    </Style>
+                                </ui:SymbolIcon.Style>
+                            </ui:SymbolIcon>
+                        </ui:Button.Icon>
+                    </ui:Button>
+                </Grid>
+
+                <!-- 步骤条与底栏的数据上下文是外壳状态（Steps / 上一步下一步命令都在 Shell 上） -->
+                <controls:StepBar Margin="0,20,0,22" DataContext="{Binding Shell}" />
+
+                <!-- 未打开仓库：引导回第 1 步（导航可直接跳到本页，此时没有分支可选） -->
+                <Border>
+                    <Border.Style>
+                        <Style BasedOn="{StaticResource AppCard}" TargetType="Border">
+                            <Setter Property="Padding" Value="22,18" />
+                            <Style.Triggers>
+                                <DataTrigger Binding="{Binding HasRepository}" Value="True">
+                                    <Setter Property="Visibility" Value="Collapsed" />
+                                </DataTrigger>
+                            </Style.Triggers>
+                        </Style>
+                    </Border.Style>
                     <StackPanel>
-                        <TextBlock Style="{StaticResource SectionHeaderText}" Text="骨架占位" />
+                        <TextBlock Style="{StaticResource SectionHeaderText}" Text="尚未打开仓库" />
                         <TextBlock
                             Margin="0,6,0,0"
                             Style="{StaticResource HintText}"
-                            Text="本页尚无业务功能。计划落地内容：本地与远程分支分组列表（带过滤与「拉取」）、提交列表（虚拟化 + 滚动增量加载 + 搜索）、提交完整预览，以及基准必须是 Head 祖先的强制校验（ticket 06、07）。" />
+                            Text="请先在第 1 步「仓库」中打开一个本地 Git 仓库，再回到本页选择提交。" />
+                        <ui:Button
+                            Margin="0,14,0,0"
+                            HorizontalAlignment="Left"
+                            Command="{Binding GoToRepositoryCommand}"
+                            Content="返回：打开仓库"
+                            Style="{StaticResource AppSecondaryButton}" />
+                    </StackPanel>
+                </Border>
+
+                <!-- 错误横幅（分支读取 / 拉取失败） -->
+                <Border>
+                    <Border.Style>
+                        <Style BasedOn="{StaticResource AppErrorBanner}" TargetType="Border">
+                            <Setter Property="Margin" Value="0,0,0,16" />
+                            <Style.Triggers>
+                                <DataTrigger Binding="{Binding HasError}" Value="False">
+                                    <Setter Property="Visibility" Value="Collapsed" />
+                                </DataTrigger>
+                            </Style.Triggers>
+                        </Style>
+                    </Border.Style>
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto" />
+                            <ColumnDefinition Width="*" />
+                        </Grid.ColumnDefinitions>
+                        <ui:SymbolIcon
+                            Grid.Column="0"
+                            FontSize="16"
+                            Foreground="{StaticResource AppDangerBrush}"
+                            Symbol="ErrorCircle24" />
+                        <TextBlock
+                            Grid.Column="1"
+                            Margin="10,0,0,0"
+                            Style="{StaticResource AppBannerText}"
+                            Text="{Binding ErrorMessage}" />
+                    </Grid>
+                </Border>
+
+                <!-- 成功/中性横幅（拉取完成 / 无远程说明） -->
+                <Border>
+                    <Border.Style>
+                        <Style BasedOn="{StaticResource AppSuccessBanner}" TargetType="Border">
+                            <Setter Property="Margin" Value="0,0,0,16" />
+                            <Style.Triggers>
+                                <DataTrigger Binding="{Binding HasInfo}" Value="False">
+                                    <Setter Property="Visibility" Value="Collapsed" />
+                                </DataTrigger>
+                            </Style.Triggers>
+                        </Style>
+                    </Border.Style>
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto" />
+                            <ColumnDefinition Width="*" />
+                        </Grid.ColumnDefinitions>
+                        <ui:SymbolIcon
+                            Grid.Column="0"
+                            FontSize="16"
+                            Foreground="{StaticResource AppSuccessBrush}"
+                            Symbol="CheckmarkCircle24" />
+                        <TextBlock
+                            Grid.Column="1"
+                            Margin="10,0,0,0"
+                            Style="{StaticResource AppSuccessText}"
+                            Text="{Binding InfoMessage}" />
+                    </Grid>
+                </Border>
+
+                <!-- 提交列表占位：基准/Head 双栏在 ticket 07 落地 -->
+                <Border>
+                    <Border.Style>
+                        <Style BasedOn="{StaticResource AppCard}" TargetType="Border">
+                            <Setter Property="Padding" Value="22,18" />
+                            <Style.Triggers>
+                                <DataTrigger Binding="{Binding HasRepository}" Value="False">
+                                    <Setter Property="Visibility" Value="Collapsed" />
+                                </DataTrigger>
+                            </Style.Triggers>
+                        </Style>
+                    </Border.Style>
+                    <StackPanel>
+                        <TextBlock Style="{StaticResource SectionHeaderText}" Text="提交列表" />
+                        <TextBlock
+                            Margin="0,6,0,0"
+                            Style="{StaticResource HintText}"
+                            Text="基准提交与 Head 提交的双栏列表（虚拟化 + 搜索 + 祖先校验）将在下一步落地。当前已完成分支选择：本地 / 远程分组、按名称过滤、「拉取」更新远程引用，以及记住每个仓库上次选中的分支。" />
                     </StackPanel>
                 </Border>
 
             </StackPanel>
         </ScrollViewer>
 
-        <controls:WorkflowFooter Grid.Row="1" Margin="30,0,30,26" />
+        <controls:WorkflowFooter Grid.Row="1" Margin="30,0,30,26" DataContext="{Binding Shell}" />
     </Grid>
 </Page>
