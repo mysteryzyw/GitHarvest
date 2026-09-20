@@ -20,4 +20,11 @@ public interface IRepositorySession
     /// 尚未选齐基准与 Head 时为 <see langword="null"/>。
     /// </summary>
     RangeSelection? SelectedRange { get; set; }
+
+    /// <summary>
+    /// 更新说明的本次草稿（第 4 步编辑器写入，spec 用户故事 40「只影响本次导出」）：
+    /// 在页面间来回切换时保留用户的编辑；范围或仓库变更后由实现清空（草稿对应的范围已变，
+    /// 再恢复旧稿会张冠李戴）。尚未生成过草稿时为 <see langword="null"/>。
+    /// </summary>
+    string? NotesDraft { get; set; }
 }

@@ -7,6 +7,7 @@ using GitHarvest.Core.Infrastructure;
 using GitHarvest.Core.Interaction;
 using GitHarvest.Core.Navigation;
 using GitHarvest.Core.Settings;
+using GitHarvest.Core.Templates;
 using GitHarvest.Shell;
 using GitHarvest.ViewModels;
 using GitHarvest.Views;
@@ -89,6 +90,7 @@ public partial class App : Application
         services.AddSingleton<IGitExecutablePathProvider>(provider => provider.GetRequiredService<ISettingsService>());
         services.AddSingleton<IGitEnvironmentService, GitEnvironmentService>();
         services.AddSingleton<IGitService, GitService>();
+        services.AddSingleton<ITemplateService, TemplateService>();
         services.AddSingleton<IExportService, ExportService>();
 
         // 壳向 ViewModel 提供的交互接缝：文件夹选择对话框与「打开输出文件夹」

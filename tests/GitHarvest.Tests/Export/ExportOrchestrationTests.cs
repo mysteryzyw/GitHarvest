@@ -1,6 +1,7 @@
 using System.Text;
 using GitHarvest.Core.Export;
 using GitHarvest.Core.Git;
+using GitHarvest.Core.Templates;
 using GitHarvest.Tests.Support;
 
 namespace GitHarvest.Tests.Export;
@@ -425,12 +426,103 @@ public sealed class ExportOrchestrationTests : IDisposable
         Assert.Equal(ExportFailure.InvalidRequest, noOutput.Failure);
     }
 
+    [Fact]
+    public async Task 编辑后的说明内容随更新包写出且占位符照常渲染()
+    {
+        // 用户故事 40：编辑器里的本次内容替代模板生成结果（插入的占位符仍按当前范围解析）。
+        var request = Request(Path.Combine(_directory.Path, "输出")) with
+        {
+            NotesOverride = "# 定制标题\r\n分支：{分支名}\r\n范围 {基准哈希}..{Head哈希}\r\n（手写内容）",
+        };
+
+        var result = await CreateService(GitWithOneAddedFile()).ExportAsync(request);
+
+        Assert.True(result.IsSuccess, result.FailureMessage);
+        var notes = await File.ReadAllTextAsync(UpdatePackageLayout.NotesPath(result.PackagePath!));
+        Assert.Contains("# 定制标题", notes, StringComparison.Ordinal);
+        Assert.Contains("分支：main", notes, StringComparison.Ordinal);
+        Assert.Contains("范围 a1b2c3d..e4f5g6h", notes, StringComparison.Ordinal);
+        // 编辑器给的是 Windows 换行：写出统一为 LF（跨工具兼容，与 UTF-8 无 BOM 同一约定）。
+        Assert.DoesNotContain("\r\n", notes, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task 编辑内容里的未知占位符原样保留且导出照常完成()
+    {
+        var request = Request(Path.Combine(_directory.Path, "输出")) with
+        {
+            NotesOverride = "笔误占位符：{更新曰期}",
+        };
+
+        var result = await CreateService(GitWithOneAddedFile()).ExportAsync(request);
+
+        Assert.True(result.IsSuccess, result.FailureMessage);
+        var notes = await File.ReadAllTextAsync(UpdatePackageLayout.NotesPath(result.PackagePath!));
+        Assert.Contains("{更新曰期}", notes, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task 自定义模板生效而读取失败时回退内置()
+    {
+        var templatePath = Path.Combine(_directory.Path, "自定义模板.md");
+        await File.WriteAllTextAsync(templatePath, "# 自定义说明\n{变更统计}");
+        var settings = new StubSettingsService
+        {
+            Settings = new GitHarvest.Core.Settings.GlobalSettings { DefaultTemplatePath = templatePath },
+        };
+
+        var customResult = await CreateService(GitWithOneAddedFile(), CreateTemplateService(settings))
+            .ExportAsync(Request(Path.Combine(_directory.Path, "输出一")));
+        var customNotes = await File.ReadAllTextAsync(UpdatePackageLayout.NotesPath(customResult.PackagePath!));
+        Assert.Contains("# 自定义说明", customNotes, StringComparison.Ordinal);
+        Assert.Contains("共 1 个文件", customNotes, StringComparison.Ordinal);
+
+        // 模板文件被删：回退内置模板照常导出（用户故事 38：自定义不会导致导出失败）。
+        File.Delete(templatePath);
+        var fallbackResult = await CreateService(GitWithOneAddedFile(), CreateTemplateService(settings))
+            .ExportAsync(Request(Path.Combine(_directory.Path, "输出二")));
+        var fallbackNotes = await File.ReadAllTextAsync(UpdatePackageLayout.NotesPath(fallbackResult.PackagePath!));
+        Assert.Contains("# 更新说明", fallbackNotes, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task 预检带出变更范围汇总供说明草稿使用()
+    {
+        var git = new FakeGitService
+        {
+            IsAncestor = true,
+            Files =
+            [
+                ChangedFile("a.cs", ChangeKind.Added, null, "b1"),
+                ChangedFile("b.cs", ChangeKind.Modified, "b-old", "b-new"),
+            ],
+            Blobs = new Dictionary<string, byte[]>(StringComparer.Ordinal)
+            {
+                ["b1"] = Bytes("1"),
+                ["b-old"] = Bytes("旧"),
+                ["b-new"] = Bytes("新"),
+            },
+        };
+
+        var result = await CreateService(git).InspectAsync(Request(Path.Combine(_directory.Path, "输出")));
+
+        Assert.True(result.IsReady);
+        Assert.NotNull(result.Summary);
+        Assert.Equal(2, result.Summary!.TotalCount);
+        Assert.Equal(1, result.Summary.CountOf(ChangeKind.Added));
+    }
+
     public void Dispose() => _directory.Dispose();
 
     private static readonly Serilog.ILogger SilentLogger =
         new Serilog.LoggerConfiguration().CreateLogger();
 
-    private static ExportService CreateService(FakeGitService git) => new(git, SilentLogger);
+    private static ExportService CreateService(FakeGitService git, ITemplateService? templateService = null)
+        => new(git, templateService ?? CreateTemplateService(), SilentLogger);
+
+    /// <summary>默认只给内置模板（不碰磁盘的桩设置）；自定义模板场景由调用方显式构造。</summary>
+    private static TemplateService CreateTemplateService(StubSettingsService? settings = null)
+        => new(settings ?? new StubSettingsService(), SilentLogger);
 
     private static FakeGitService GitWithOneAddedFile() => new()
     {

@@ -6,8 +6,10 @@ using GitHarvest.Core.Export;
 using GitHarvest.Core.Git;
 using GitHarvest.Core.Infrastructure;
 using GitHarvest.Core.Interaction;
+using GitHarvest.Core.Markdown;
 using GitHarvest.Core.Navigation;
 using GitHarvest.Core.Settings;
+using GitHarvest.Core.Templates;
 using Serilog;
 
 namespace GitHarvest.ViewModels;
@@ -38,16 +40,17 @@ public enum NotesPageState
 }
 
 /// <summary>
-/// 更新说明页（工作流第 4 步）的状态：本 ticket 落地「导出」这条链路——
-/// 更新日期目录名（默认 yyyy-MM-dd、可编辑）、导出前检查（文件系统冲突）、
-/// 后台导出 + 进度 + 取消、完成提示与「打开输出文件夹」。
-/// 更新说明的内容由 Core 的默认生成器给出，编辑器与 12 个占位符由 ticket 10 接管。
+/// 更新说明页（工作流第 4 步）的状态：导出链路（ticket 09）+ 说明编辑（ticket 10）——
+/// 双栏编辑器（左 Markdown / 右实时预览）、工具栏插入占位符与格式、「重置为模板」；
+/// 说明草稿按当前范围经 <see cref="ITemplateService"/> 渲染生成，编辑内容存进会话
+/// （只影响本次导出、不动模板本身），导出时随请求交给 Core 渲染写出。
 /// 范围来自 <see cref="IRepositorySession.SelectedRange"/>（第 2 步写入）；
 /// 导出本身经 <see cref="IExportService"/>（本类不碰 git 进程与文件系统）。
 /// </summary>
 public sealed partial class NotesViewModel : ObservableObject
 {
     private readonly IExportService _exportService;
+    private readonly ITemplateService _templateService;
     private readonly IRepositorySession _session;
     private readonly ISettingsService _settings;
     private readonly IExportWarningGate _warningGate;
@@ -61,12 +64,16 @@ public sealed partial class NotesViewModel : ObservableObject
     /// <summary>最近一次成功导出的更新包目录（供「打开输出文件夹」用）。</summary>
     private string? _outputPackagePath;
 
+    /// <summary>预检带出的变更范围汇总：说明草稿与实时预览的占位符取值都从它算（与导出同一份数字）。</summary>
+    private ChangeRangeSummary? _summary;
+
     /// <summary>进入页面的时间点：默认目录名与导出请求的时间戳都取它，避免跨零点时两处不一致。</summary>
     private readonly DateTimeOffset _openedAt = DateTimeOffset.Now;
 
     public NotesViewModel(
         ShellViewModel shell,
         IExportService exportService,
+        ITemplateService templateService,
         IRepositorySession session,
         ISettingsService settings,
         IExportWarningGate warningGate,
@@ -76,6 +83,7 @@ public sealed partial class NotesViewModel : ObservableObject
     {
         ArgumentNullException.ThrowIfNull(shell);
         ArgumentNullException.ThrowIfNull(exportService);
+        ArgumentNullException.ThrowIfNull(templateService);
         ArgumentNullException.ThrowIfNull(session);
         ArgumentNullException.ThrowIfNull(settings);
         ArgumentNullException.ThrowIfNull(warningGate);
@@ -85,6 +93,7 @@ public sealed partial class NotesViewModel : ObservableObject
 
         Shell = shell;
         _exportService = exportService;
+        _templateService = templateService;
         _session = session;
         _settings = settings;
         _warningGate = warningGate;
@@ -197,6 +206,44 @@ public sealed partial class NotesViewModel : ObservableObject
     [ObservableProperty]
     private bool _showCompletionPrompt;
 
+    /// <summary>工具栏「插入占位符」菜单的数据源（12 个占位符目录，Core 的唯一真相源）。</summary>
+    public IReadOnlyList<TemplatePlaceholder> Placeholders => NotesTemplateCatalog.Placeholders;
+
+    /// <summary>工具栏右侧的占位符说明：个数取自 Core 目录（不在界面层再写死一份）。</summary>
+    public string PlaceholderToolbarHint
+        => $"共 {NotesTemplateCatalog.Placeholders.Count} 个模板占位符 · 默认模板可在全局设置中指定";
+
+    /// <summary>
+    /// 编辑器内容（左栏 Markdown 原文，可含占位符）：初始为按当前范围渲染出的说明草稿，
+    /// 编辑逐键写回会话草稿（页面来回切换不丢），导出时作为 <see cref="ExportRequest.NotesOverride"/> 交给 Core。
+    /// </summary>
+    [ObservableProperty]
+    private string _editorText = string.Empty;
+
+    /// <summary>右栏实时预览的块序列（占位符先渲染、再过迷你解析；所见即所得）。</summary>
+    [ObservableProperty]
+    private IReadOnlyList<MarkdownBlock> _previewBlocks = [];
+
+    /// <summary>自定义模板读取失败的回退提示（用户故事 38）；未走回退时为空。</summary>
+    [ObservableProperty]
+    private string _templateNotice = string.Empty;
+
+    /// <summary>是否显示模板回退提示条。</summary>
+    public bool HasTemplateNotice => TemplateNotice.Length > 0;
+
+    /// <summary>未知占位符的合并警告（用户故事 39：原样保留并提示笔误）；没有时为空。</summary>
+    [ObservableProperty]
+    private string _placeholderWarning = string.Empty;
+
+    /// <summary>是否显示未知占位符警告条。</summary>
+    public bool HasPlaceholderWarning => PlaceholderWarning.Length > 0;
+
+    /// <summary>是否显示编辑器卡（范围与汇总就绪——引导、空范围、预检失败时不显示）。</summary>
+    public bool ShowEditor => _summary is not null;
+
+    /// <summary>编辑器是否可编辑（导出进行中锁定，防止内容与写出中的说明打架）。</summary>
+    public bool CanEdit => _summary is not null && !IsExporting;
+
     /// <summary>是否可以开始导出（就绪、目录名合法、当前没有导出在跑）。</summary>
     public bool CanStartExport => State == NotesPageState.Ready && !HasFolderNameError;
 
@@ -227,6 +274,7 @@ public sealed partial class NotesViewModel : ObservableObject
         {
             State = NotesPageState.Guide;
             HasStructure = false;
+            ResetEditor();
             return;
         }
 
@@ -236,6 +284,7 @@ public sealed partial class NotesViewModel : ObservableObject
         {
             // 输出路径还没选、或 git 访问失败：本页给出原因并禁止导出（第 3 步另有解释）。
             HasStructure = false;
+            ResetEditor();
             ShowUnavailable(precheck.FailureMessage ?? "无法导出。");
             return;
         }
@@ -243,11 +292,13 @@ public sealed partial class NotesViewModel : ObservableObject
         if (precheck.IsEmptyRange)
         {
             HasStructure = false;
+            ResetEditor();
             ShowUnavailable(precheck.FailureMessage ?? "变更范围内没有任何文件变更。");
             return;
         }
 
         ApplyPlan(precheck.Plan!);
+        await SetupEditorAsync(precheck.Summary).ConfigureAwait(true);
 
         if (precheck.IsBlockedByConflicts)
         {
@@ -325,6 +376,21 @@ public sealed partial class NotesViewModel : ObservableObject
     [RelayCommand]
     private void GoToPickCommits() => _navigator.NavigateTo(ShellPage.PickCommits);
 
+    /// <summary>
+    /// 「重置为模板」：丢弃当前编辑内容，按当前范围重新渲染模板生成草稿（用户故事 40）。
+    /// 模板经 <see cref="ITemplateService.LoadTemplateAsync"/> 重新加载——设置里的自定义模板刚换过也立即生效。
+    /// </summary>
+    [RelayCommand(CanExecute = nameof(CanEdit))]
+    private async Task ResetToTemplateAsync()
+    {
+        if (_summary is null)
+        {
+            return;
+        }
+
+        EditorText = await GenerateDraftAsync().ConfigureAwait(true);
+    }
+
     partial void OnStateChanged(NotesPageState value)
     {
         OnPropertyChanged(nameof(IsExporting));
@@ -334,7 +400,9 @@ public sealed partial class NotesViewModel : ObservableObject
         OnPropertyChanged(nameof(ShowOpenOutputFolder));
         OnPropertyChanged(nameof(StatusKind));
         OnPropertyChanged(nameof(CanStartExport));
+        OnPropertyChanged(nameof(CanEdit));
         StartExportCommand.NotifyCanExecuteChanged();
+        ResetToTemplateCommand.NotifyCanExecuteChanged();
     }
 
     partial void OnFolderNameChanged(string value)
@@ -346,6 +414,87 @@ public sealed partial class NotesViewModel : ObservableObject
     }
 
     partial void OnOutputPathChanged(string value) => OnPropertyChanged(nameof(OutputPathDisplay));
+
+    partial void OnEditorTextChanged(string value)
+    {
+        // 草稿只跟着有范围的页面走：引导态清空编辑器时不写会话（那会儿的空串不是用户的选择）。
+        if (HasRange)
+        {
+            _session.NotesDraft = value;
+        }
+
+        RefreshPreview();
+    }
+
+    partial void OnTemplateNoticeChanged(string value) => OnPropertyChanged(nameof(HasTemplateNotice));
+
+    partial void OnPlaceholderWarningChanged(string value) => OnPropertyChanged(nameof(HasPlaceholderWarning));
+
+    /// <summary>
+    /// 预检带出了变更范围汇总后装配编辑器：有会话草稿先恢复（页面来回切换不丢编辑），
+    /// 否则按当前范围渲染模板生成草稿。
+    /// </summary>
+    private async Task SetupEditorAsync(ChangeRangeSummary? summary)
+    {
+        _summary = summary;
+        OnPropertyChanged(nameof(ShowEditor));
+        OnPropertyChanged(nameof(CanEdit));
+        ResetToTemplateCommand.NotifyCanExecuteChanged();
+
+        if (summary is null)
+        {
+            EditorText = string.Empty;
+            return;
+        }
+
+        EditorText = _session.NotesDraft ?? await GenerateDraftAsync().ConfigureAwait(true);
+    }
+
+    /// <summary>汇总不可用时的编辑器复位（引导 / 空范围 / 预检失败）。</summary>
+    private void ResetEditor()
+    {
+        _summary = null;
+        OnPropertyChanged(nameof(ShowEditor));
+        OnPropertyChanged(nameof(CanEdit));
+        ResetToTemplateCommand.NotifyCanExecuteChanged();
+        EditorText = string.Empty;
+        PreviewBlocks = [];
+        TemplateNotice = string.Empty;
+        PlaceholderWarning = string.Empty;
+    }
+
+    /// <summary>加载当前生效的模板并渲染成说明草稿；回退提示同时落到提示条上。</summary>
+    private async Task<string> GenerateDraftAsync()
+    {
+        var loaded = await _templateService.LoadTemplateAsync().ConfigureAwait(true);
+        TemplateNotice = loaded.Notice ?? string.Empty;
+
+        return _templateService.Render(loaded.Text, CreateNotesContext()).Content;
+    }
+
+    /// <summary>
+    /// 实时预览：编辑内容先过占位符渲染（未知占位符的警告同步刷新），再喂给迷你解析器。
+    /// 与最终写出走同一个渲染入口（Core 的 <see cref="ITemplateService.Render"/>），所见即所得。
+    /// </summary>
+    private void RefreshPreview()
+    {
+        if (_summary is null)
+        {
+            PreviewBlocks = [];
+            PlaceholderWarning = string.Empty;
+            return;
+        }
+
+        var rendered = _templateService.Render(EditorText, CreateNotesContext());
+        PlaceholderWarning = rendered.Warnings.Count > 0
+            ? string.Join(' ', rendered.Warnings)
+            : string.Empty;
+        PreviewBlocks = MarkdownMiniParser.Parse(rendered.Content);
+    }
+
+    /// <summary>按当前范围与页面输入构建占位符上下文（与导出写出口径一致：同一份请求与汇总）。</summary>
+    private NotesTemplateContext CreateNotesContext()
+        => NotesTemplateContext.From(CreateRequest(), _summary!);
 
     partial void OnAddedFileCountChanged(int value) => OnPropertyChanged(nameof(AddedFileNote));
 
@@ -534,7 +683,7 @@ public sealed partial class NotesViewModel : ObservableObject
         StatusChip = "不可导出";
     }
 
-    /// <summary>按当前会话与页面输入构造导出请求（时间戳与默认目录名同源）。</summary>
+    /// <summary>按当前会话与页面输入构造导出请求（时间戳与默认目录名同源；编辑器内容作为本次导出专用稿）。</summary>
     private ExportRequest CreateRequest()
     {
         var repository = _session.OpenedRepository!;
@@ -547,7 +696,10 @@ public sealed partial class NotesViewModel : ObservableObject
             _openedAt,
             repository.CurrentBranch ?? "HEAD",
             range.Base,
-            range.Head);
+            range.Head)
+        {
+            NotesOverride = EditorText,
+        };
     }
 
     /// <summary>范围取自会话，进入页面时刷新与它相关的展示属性。</summary>

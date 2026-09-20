@@ -6,10 +6,11 @@
     xmlns:ui="http://schemas.lepo.co/wpfui/2022/xaml">
 
     <!--
-        更新说明页（工作流第 4 步，ticket 09 落地导出链路）。
-        布局对齐原型：标题行 + 步骤条 + 导出状态卡（原型页 4 的 done-hero）+ 更新包结构卡
-        （原型页 4 的「更新包结构」）+ 页脚（更新日期目录与输出路径，右侧是「上一步 / 开始导出」）。
-        更新说明的编辑器留给 ticket 10，本页先放一张说明卡占位。
+        更新说明页（工作流第 4 步）：导出链路（ticket 09）+ 说明编辑器（ticket 10）。
+        布局对齐原型：标题行（右侧「重置为模板」）+ 步骤条 + 导出状态卡（原型页 4 的 done-hero）
+        + 更新包结构卡 + 双栏编辑器卡（原型页 3 的 .editor-wrap：工具栏 + 左编辑右预览）
+        + 页脚（更新日期目录与输出路径，右侧是「上一步 / 开始导出」）。
+        工具栏的占位符插入与 B/I/代码/列表是「在光标处动文本」的视图操作，全部在代码后置完成；
         导出中显示进度条与取消；冲突、空范围、失败、取消各有自己的呈现。
     -->
 
@@ -25,8 +26,34 @@
             VerticalScrollBarVisibility="Auto">
             <StackPanel Style="{StaticResource PageLayout}">
 
-                <TextBlock Style="{StaticResource PageTitleText}" Text="{Binding Shell.CurrentTitle}" />
-                <TextBlock Style="{StaticResource PageSubtitleText}" Text="由默认模板生成，导出前可编辑；将随更新包一同输出为「更新说明.md」。" />
+                <Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="Auto" />
+                    </Grid.ColumnDefinitions>
+                    <StackPanel Grid.Column="0">
+                        <TextBlock Style="{StaticResource PageTitleText}" Text="{Binding Shell.CurrentTitle}" />
+                        <TextBlock Style="{StaticResource PageSubtitleText}" Text="由默认模板生成，导出前可编辑；将随更新包一同输出为「更新说明.md」。" />
+                    </StackPanel>
+                    <!-- 原型标题行右侧的 subtle 按钮：丢弃编辑、恢复为按当前范围生成的草稿 -->
+                    <ui:Button
+                        Grid.Column="1"
+                        Padding="10,6"
+                        VerticalAlignment="Top"
+                        Command="{Binding ResetToTemplateCommand}"
+                        Style="{StaticResource AppSubtleButton}">
+                        <StackPanel Orientation="Horizontal">
+                            <ui:SymbolIcon
+                                VerticalAlignment="Center"
+                                FontSize="14"
+                                Symbol="ArrowClockwise24" />
+                            <TextBlock
+                                Margin="6,0,0,0"
+                                VerticalAlignment="Center"
+                                Text="重置为模板" />
+                        </StackPanel>
+                    </ui:Button>
+                </Grid>
 
                 <controls:StepBar Margin="0,20,0,22" DataContext="{Binding Shell}" />
 
@@ -359,15 +386,254 @@
                     </StackPanel>
                 </Border>
 
-                <!-- 更新说明编辑器占位（ticket 10 落地） -->
-                <Border Margin="0,0,0,16" Style="{StaticResource AppCard}">
-                    <StackPanel>
-                        <TextBlock Style="{StaticResource SectionHeaderText}" Text="更新说明编辑器" />
-                        <TextBlock
-                            Margin="0,6,0,0"
-                            Style="{StaticResource HintText}"
-                            Text="本 ticket 先用自动生成的默认内容（随更新包写出为「更新说明.md」）；左右双栏编辑、占位符插入与「重置为模板」在 ticket 10 落地。" />
+                <!-- 自定义模板读取失败的回退提示（用户故事 38：回退内置并告知） -->
+                <Border Margin="0,0,0,16">
+                    <Border.Style>
+                        <Style BasedOn="{StaticResource AppWarningBanner}" TargetType="Border">
+                            <Setter Property="Visibility" Value="Collapsed" />
+                            <Style.Triggers>
+                                <DataTrigger Binding="{Binding HasTemplateNotice}" Value="True">
+                                    <Setter Property="Visibility" Value="Visible" />
+                                </DataTrigger>
+                            </Style.Triggers>
+                        </Style>
+                    </Border.Style>
+                    <StackPanel Orientation="Horizontal">
+                        <ui:SymbolIcon
+                            Margin="0,0,10,0"
+                            VerticalAlignment="Top"
+                            FontSize="16"
+                            Foreground="{StaticResource AppWarnTextBrush}"
+                            Symbol="Warning24" />
+                        <TextBlock Style="{StaticResource AppWarningText}" Text="{Binding TemplateNotice}" />
                     </StackPanel>
+                </Border>
+
+                <!-- 未知占位符警告（用户故事 39：原样保留并提示可能的笔误） -->
+                <Border Margin="0,0,0,16">
+                    <Border.Style>
+                        <Style BasedOn="{StaticResource AppWarningBanner}" TargetType="Border">
+                            <Setter Property="Visibility" Value="Collapsed" />
+                            <Style.Triggers>
+                                <DataTrigger Binding="{Binding HasPlaceholderWarning}" Value="True">
+                                    <Setter Property="Visibility" Value="Visible" />
+                                </DataTrigger>
+                            </Style.Triggers>
+                        </Style>
+                    </Border.Style>
+                    <StackPanel Orientation="Horizontal">
+                        <ui:SymbolIcon
+                            Margin="0,0,10,0"
+                            VerticalAlignment="Top"
+                            FontSize="16"
+                            Foreground="{StaticResource AppWarnTextBrush}"
+                            Symbol="Warning24" />
+                        <TextBlock Style="{StaticResource AppWarningText}" Text="{Binding PlaceholderWarning}" />
+                    </StackPanel>
+                </Border>
+
+                <!--
+                    更新说明编辑器（原型页 3 的 .editor-wrap）：工具栏横跨整卡，
+                    下面左右两栏——左「编辑（Markdown）」等宽输入、右「预览」实时排版。
+                    卡片内边距压成 0，栏间分隔线贴卡缘（原型 gap:0 + border-left）。
+                -->
+                <Border Margin="0,0,0,16" Padding="0">
+                    <Border.Style>
+                        <Style BasedOn="{StaticResource AppCard}" TargetType="Border">
+                            <Setter Property="Visibility" Value="Collapsed" />
+                            <Style.Triggers>
+                                <DataTrigger Binding="{Binding ShowEditor}" Value="True">
+                                    <Setter Property="Visibility" Value="Visible" />
+                                </DataTrigger>
+                            </Style.Triggers>
+                        </Style>
+                    </Border.Style>
+                    <Grid IsEnabled="{Binding CanEdit}">
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto" />
+                            <RowDefinition Height="430" />
+                        </Grid.RowDefinitions>
+
+                        <!-- 工具栏（原型 .ed-toolbar：半透底 + 下分隔线） -->
+                        <Border
+                            Grid.Row="0"
+                            Padding="14,10"
+                            Background="{StaticResource AppSurfaceBrush}"
+                            BorderBrush="{StaticResource AppStrokeBrush}"
+                            BorderThickness="0,0,0,1"
+                            CornerRadius="8,8,0,0">
+                            <Grid>
+                                <StackPanel Grid.Column="0" Orientation="Horizontal">
+                                    <ui:Button
+                                        x:Name="PlaceholderButton"
+                                        Height="28"
+                                        Padding="10,0"
+                                        Click="OnPlaceholderButtonClick"
+                                        FontSize="12"
+                                        Style="{StaticResource AppSecondaryButton}">
+                                        <StackPanel Orientation="Horizontal">
+                                            <TextBlock VerticalAlignment="Center" Text="插入占位符" />
+                                            <TextBlock
+                                                Margin="6,0,0,0"
+                                                VerticalAlignment="Center"
+                                                FontSize="10"
+                                                Text="▾" />
+                                        </StackPanel>
+                                    </ui:Button>
+                                    <Popup
+                                        x:Name="PlaceholderPopup"
+                                        AllowsTransparency="True"
+                                        Placement="Bottom"
+                                        PlacementTarget="{Binding ElementName=PlaceholderButton}"
+                                        StaysOpen="False">
+                                        <Border Width="300" Style="{StaticResource AppComboMenu}">
+                                            <ScrollViewer MaxHeight="300" VerticalScrollBarVisibility="Auto">
+                                                <ItemsControl ItemsSource="{Binding Placeholders}">
+                                                    <ItemsControl.ItemTemplate>
+                                                        <DataTemplate>
+                                                            <!-- 原型 .ph-item：占位符名（等宽强调色）+ 一句说明 -->
+                                                            <Button
+                                                                Click="OnPlaceholderItemClick"
+                                                                Style="{StaticResource AppComboMenuItem}"
+                                                                Tag="{Binding Name}">
+                                                                <StackPanel Margin="0,2">
+                                                                    <TextBlock
+                                                                        FontFamily="{StaticResource AppMonospaceFontFamily}"
+                                                                        FontSize="12"
+                                                                        Foreground="{StaticResource AppAccentBrush}"
+                                                                        Text="{Binding Name, StringFormat={}{{{0}}}}" />
+                                                                    <TextBlock
+                                                                        Margin="0,1,0,0"
+                                                                        FontSize="11"
+                                                                        Foreground="{DynamicResource TextFillColorTertiaryBrush}"
+                                                                        Text="{Binding Description}" />
+                                                                </StackPanel>
+                                                            </Button>
+                                                        </DataTemplate>
+                                                    </ItemsControl.ItemTemplate>
+                                                </ItemsControl>
+                                            </ScrollViewer>
+                                        </Border>
+                                    </Popup>
+
+                                    <ui:Button
+                                        Margin="8,0,0,0"
+                                        Padding="10,0"
+                                        Click="OnBoldClick"
+                                        Content="B"
+                                        FontSize="12"
+                                        FontWeight="Bold"
+                                        Style="{StaticResource AppSubtleButton}" />
+                                    <ui:Button
+                                        Padding="10,0"
+                                        Click="OnItalicClick"
+                                        Content="I"
+                                        FontSize="12"
+                                        FontStyle="Italic"
+                                        Style="{StaticResource AppSubtleButton}" />
+                                    <ui:Button
+                                        Padding="10,0"
+                                        Click="OnCodeClick"
+                                        Content="&lt;/&gt;"
+                                        FontFamily="{StaticResource AppMonospaceFontFamily}"
+                                        FontSize="12"
+                                        Style="{StaticResource AppSubtleButton}" />
+                                    <ui:Button
+                                        Padding="10,0"
+                                        Click="OnListClick"
+                                        Content="≡ 列表"
+                                        FontSize="12"
+                                        Style="{StaticResource AppSubtleButton}" />
+                                </StackPanel>
+                                <TextBlock
+                                    HorizontalAlignment="Right"
+                                    VerticalAlignment="Center"
+                                    FontSize="11.5"
+                                    Foreground="{DynamicResource TextFillColorTertiaryBrush}"
+                                    Text="{Binding PlaceholderToolbarHint}" />
+                            </Grid>
+                        </Border>
+
+                        <!-- 左右双栏（原型 .ed-col：栏头 + 内容，右栏带左分隔线；固定 430 高对齐原型 min-height） -->
+                        <Grid Grid.Row="1">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="*" />
+                            </Grid.ColumnDefinitions>
+
+                            <Grid Grid.Column="0">
+                                <Grid.RowDefinitions>
+                                    <RowDefinition Height="Auto" />
+                                    <RowDefinition Height="*" />
+                                </Grid.RowDefinitions>
+                                <Border
+                                    Grid.Row="0"
+                                    Padding="16,9"
+                                    BorderBrush="{StaticResource AppStrokeBrush}"
+                                    BorderThickness="0,0,0,1">
+                                    <TextBlock
+                                        FontSize="11.5"
+                                        Foreground="{DynamicResource TextFillColorTertiaryBrush}"
+                                        Text="编辑（Markdown）" />
+                                </Border>
+                                <!--
+                                    无边框等宽编辑框（原型 textarea：透明底、不折行、resize:none）。
+                                    用原生 TextBox 而不是 ui:TextBox——后者模板自带描边与图标位，还原不了无边框形态。
+                                    滚轮自留（PreviewMouseWheel）：编辑框到顶/底后 WPF 会把滚轮事件放行给页面，
+                                    鼠标停在这一栏却把整页滚走；这里显式接管，与右栏预览保持同一体感。
+                                -->
+                                <TextBox
+                                    x:Name="EditorBox"
+                                    Grid.Row="1"
+                                    Padding="18,14"
+                                    HorizontalScrollBarVisibility="Auto"
+                                    VerticalScrollBarVisibility="Auto"
+                                    AcceptsReturn="True"
+                                    Background="Transparent"
+                                    BorderThickness="0"
+                                    FocusVisualStyle="{x:Null}"
+                                    FontFamily="{StaticResource AppMonospaceFontFamily}"
+                                    FontSize="12.5"
+                                    PreviewMouseWheel="OnPanePreviewMouseWheel"
+                                    SpellCheck.IsEnabled="False"
+                                    Text="{Binding EditorText, UpdateSourceTrigger=PropertyChanged}"
+                                    TextWrapping="NoWrap" />
+                            </Grid>
+
+                            <Border
+                                Grid.Column="1"
+                                BorderBrush="{StaticResource AppStrokeBrush}"
+                                BorderThickness="1,0,0,0">
+                                <Grid>
+                                    <Grid.RowDefinitions>
+                                        <RowDefinition Height="Auto" />
+                                        <RowDefinition Height="*" />
+                                    </Grid.RowDefinitions>
+                                    <Border
+                                        Grid.Row="0"
+                                        Padding="16,9"
+                                        BorderBrush="{StaticResource AppStrokeBrush}"
+                                        BorderThickness="0,0,0,1">
+                                        <TextBlock
+                                            FontSize="11.5"
+                                            Foreground="{DynamicResource TextFillColorTertiaryBrush}"
+                                            Text="预览" />
+                                    </Border>
+                                    <!-- 预览栏同样自留滚轮：两栏「谁的滚轮谁滚」，不牵连整页 -->
+                                    <ScrollViewer
+                                        x:Name="PreviewScroll"
+                                        Grid.Row="1"
+                                        Padding="20,14"
+                                        PreviewMouseWheel="OnPanePreviewMouseWheel"
+                                        VerticalScrollBarVisibility="Auto">
+                                        <controls:MarkdownPreviewView
+                                            Blocks="{Binding PreviewBlocks}"
+                                            Foreground="{DynamicResource TextFillColorPrimaryBrush}" />
+                                    </ScrollViewer>
+                                </Grid>
+                            </Border>
+                        </Grid>
+                    </Grid>
                 </Border>
 
             </StackPanel>

@@ -21,4 +21,12 @@ public sealed record ExportRequest(
     DateTimeOffset RequestedAt,
     string BranchName,
     CommitSummary Base,
-    CommitSummary Head);
+    CommitSummary Head)
+{
+    /// <summary>
+    /// 编辑后的更新说明内容（第 4 步双栏编辑器的本次导出专用稿，spec 用户故事 40）：
+    /// 非空时替代模板生成结果写出——其中插入的占位符仍会按当前范围渲染；
+    /// 为 <see langword="null"/> 时按当前生效的模板（自定义或内置）生成。只影响本次导出，不动模板本身。
+    /// </summary>
+    public string? NotesOverride { get; init; }
+}

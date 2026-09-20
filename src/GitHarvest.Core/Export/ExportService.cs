@@ -1,4 +1,5 @@
 using GitHarvest.Core.Git;
+using GitHarvest.Core.Templates;
 using Serilog;
 
 namespace GitHarvest.Core.Export;
@@ -9,6 +10,7 @@ namespace GitHarvest.Core.Export;
 /// 「导出更新包」（范围 → 冲突预扫描 → 快照写出 → 更新说明）。
 /// git 访问全部经 <see cref="IGitService"/>（ADR-0001：本类不碰 git 进程；文件系统则归本类，
 /// 这是「快照写出」这一步的职责），因此单元测试可以 mock 该接口、只留真实临时目录来断言产物。
+/// 更新说明的文本由 <see cref="ITemplateService"/> 渲染（模板或页面编辑后的本次内容）。
 /// </summary>
 public sealed class ExportService : IExportService
 {
@@ -16,16 +18,20 @@ public sealed class ExportService : IExportService
     private static readonly System.Text.UTF8Encoding Utf8WithoutBom = new(encoderShouldEmitUTF8Identifier: false);
 
     private readonly IGitService _gitService;
+    private readonly ITemplateService _templateService;
     private readonly ILogger _logger;
 
     /// <param name="gitService">仓库级 Git 操作的唯一接口（范围计算与取文件内容都经它）。</param>
+    /// <param name="templateService">更新说明的模板加载与占位符渲染。</param>
     /// <param name="logger">导出过程与失败原因写这里，便于排查。</param>
-    public ExportService(IGitService gitService, ILogger logger)
+    public ExportService(IGitService gitService, ITemplateService templateService, ILogger logger)
     {
         ArgumentNullException.ThrowIfNull(gitService);
+        ArgumentNullException.ThrowIfNull(templateService);
         ArgumentNullException.ThrowIfNull(logger);
 
         _gitService = gitService;
+        _templateService = templateService;
         _logger = logger;
     }
 
@@ -235,8 +241,8 @@ public sealed class ExportService : IExportService
             summary.CountOf(ChangeKind.Deleted));
 
         return conflicts.Count > 0
-            ? new Inspection(ExportPrecheckResult.Blocked(packagePlan, conflicts), summary, plan)
-            : new Inspection(ExportPrecheckResult.Ready(packagePlan), summary, plan);
+            ? new Inspection(ExportPrecheckResult.Blocked(packagePlan, conflicts, summary), summary, plan)
+            : new Inspection(ExportPrecheckResult.Ready(packagePlan, summary), summary, plan);
 
         Inspection Failed(ExportPrecheckResult precheck) => new(precheck, Summary: null, Plan: null);
     }
@@ -331,7 +337,7 @@ public sealed class ExportService : IExportService
 
         Report(progress, ExportPhase.WritingNotes, completedSteps, totalSteps);
 
-        var notes = UpdateNotesComposer.Compose(request, summary);
+        var notes = await ComposeNotesAsync(request, summary, cancellationToken).ConfigureAwait(false);
         var notesBytes = Utf8WithoutBom.GetBytes(notes);
         await File.WriteAllBytesAsync(UpdatePackageLayout.NotesPath(packagePath), notesBytes, cancellationToken)
             .ConfigureAwait(false);
@@ -346,6 +352,44 @@ public sealed class ExportService : IExportService
             summary.CountOf(ChangeKind.Added),
             summary.CountOf(ChangeKind.Deleted),
             totalBytes);
+    }
+
+    /// <summary>
+    /// 生成要随更新包写出的更新说明文本（LF 换行）：
+    /// 页面给了本次编辑内容（<see cref="ExportRequest.NotesOverride"/>）就以它为准，
+    /// 否则按当前生效的模板（自定义或内置）生成；两者都过同一渲染入口——
+    /// 编辑时插入的占位符在写出前同样被渲染，未知占位符原样保留并记 Warning（用户故事 39/40）。
+    /// </summary>
+    private async Task<string> ComposeNotesAsync(
+        ExportRequest request,
+        ChangeRangeSummary summary,
+        CancellationToken cancellationToken)
+    {
+        var context = NotesTemplateContext.From(request, summary);
+
+        RenderedNotes rendered;
+        if (request.NotesOverride is { } overrideText)
+        {
+            rendered = _templateService.Render(overrideText, context);
+        }
+        else
+        {
+            var loaded = await _templateService.LoadTemplateAsync(cancellationToken).ConfigureAwait(false);
+            if (loaded.Notice is { } notice)
+            {
+                _logger.Warning("生成更新说明：{Notice}", notice);
+            }
+
+            rendered = _templateService.Render(loaded.Text, context);
+        }
+
+        foreach (var warning in rendered.Warnings)
+        {
+            _logger.Warning("更新说明：{PlaceholderWarning}", warning);
+        }
+
+        // 编辑器给出的是 Windows 换行：统一成 LF，跨工具打开不窜行（与 UTF-8 无 BOM 同为兼容性约定）。
+        return rendered.Content.Replace("\r\n", "\n");
     }
 
     /// <summary>

@@ -204,7 +204,10 @@ public sealed class ExportSnapshotTests : IDisposable
     public void Dispose() => _directory.Dispose();
 
     private static ExportService CreateService()
-        => new(new GitService(StubGitEnvironment.Available(), new GitCliRunner(), SilentLogger), SilentLogger);
+        => new(
+            new GitService(StubGitEnvironment.Available(), new GitCliRunner(), SilentLogger),
+            new GitHarvest.Core.Templates.TemplateService(new StubSettingsService(), SilentLogger),
+            SilentLogger);
 
     private Task<string> CreateRepositoryAsync(string name, int commitCount = 0)
         => TestRepository.CreateAsync(_directory.Path, name, commitCount);

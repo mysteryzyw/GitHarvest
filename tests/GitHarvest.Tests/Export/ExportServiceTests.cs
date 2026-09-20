@@ -107,7 +107,8 @@ public sealed class ExportServiceTests
     private static readonly Serilog.ILogger SilentLogger =
         new Serilog.LoggerConfiguration().CreateLogger();
 
-    private static ExportService CreateService(FakeGitService git) => new(git, SilentLogger);
+    private static ExportService CreateService(FakeGitService git)
+        => new(git, new GitHarvest.Core.Templates.TemplateService(new StubSettingsService(), SilentLogger), SilentLogger);
 
     private static ChangedFile Make(ChangeKind kind, string path)
         => new(path, null, kind, OtherChangeReason.None, 1, 1, null, 10, null, null);

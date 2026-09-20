@@ -1,3 +1,5 @@
+using GitHarvest.Core.Git;
+
 namespace GitHarvest.Core.Export;
 
 /// <summary>
@@ -29,6 +31,7 @@ public sealed record ExportPrecheckResult
     private ExportPrecheckResult(
         UpdatePackagePlan? plan,
         IReadOnlyList<FileSystemConflict>? conflicts,
+        ChangeRangeSummary? summary,
         bool isEmptyRange,
         ExportFailure failure,
         string? failureMessage,
@@ -36,6 +39,7 @@ public sealed record ExportPrecheckResult
     {
         Plan = plan;
         Conflicts = conflicts;
+        Summary = summary;
         IsEmptyRange = isEmptyRange;
         Failure = failure;
         FailureMessage = failureMessage;
@@ -60,6 +64,12 @@ public sealed record ExportPrecheckResult
     /// <summary>文件系统冲突清单（<see cref="IsBlockedByConflicts"/> 时非空）。</summary>
     public IReadOnlyList<FileSystemConflict>? Conflicts { get; }
 
+    /// <summary>
+    /// 变更范围汇总（就绪或被冲突拦下时非空）：更新说明页据此渲染模板生成说明草稿，
+    /// 与预览页、最终写出的说明同一份数字；空范围或失败时为 <see langword="null"/>。
+    /// </summary>
+    public ChangeRangeSummary? Summary { get; }
+
     /// <summary>失败类别；其余结论为 <see cref="ExportFailure.None"/>。</summary>
     public ExportFailure Failure { get; }
 
@@ -70,11 +80,13 @@ public sealed record ExportPrecheckResult
     public string? TechnicalDetail { get; }
 
     /// <summary>构造「就绪」的结果。</summary>
-    public static ExportPrecheckResult Ready(UpdatePackagePlan plan)
+    /// <param name="plan">更新包结构。</param>
+    /// <param name="summary">变更范围汇总（更新说明页生成说明草稿用）。</param>
+    public static ExportPrecheckResult Ready(UpdatePackagePlan plan, ChangeRangeSummary? summary = null)
     {
         ArgumentNullException.ThrowIfNull(plan);
 
-        return new(plan, conflicts: null, isEmptyRange: false, ExportFailure.None, null, null);
+        return new(plan, conflicts: null, summary, isEmptyRange: false, ExportFailure.None, null, null);
     }
 
     /// <summary>构造「空范围」的结果（可能同时带着结构：空范围时结构数字全为 0）。</summary>
@@ -82,15 +94,20 @@ public sealed record ExportPrecheckResult
         => new(
             plan: null,
             conflicts: null,
+            summary: null,
             isEmptyRange: true,
             ExportFailure.None,
             "变更范围内没有任何文件变更，没有可导出的内容；请回到第 2 步重新选择基准提交与 Head 提交。",
             technicalDetail: null);
 
     /// <summary>构造「文件系统冲突」的结果（结构照常给出，便于界面展示「本可包含什么」）。</summary>
+    /// <param name="plan">更新包结构。</param>
+    /// <param name="conflicts">冲突清单。</param>
+    /// <param name="summary">变更范围汇总（更新说明页生成说明草稿用）。</param>
     public static ExportPrecheckResult Blocked(
         UpdatePackagePlan plan,
-        IReadOnlyList<FileSystemConflict> conflicts)
+        IReadOnlyList<FileSystemConflict> conflicts,
+        ChangeRangeSummary? summary = null)
     {
         ArgumentNullException.ThrowIfNull(plan);
         ArgumentNullException.ThrowIfNull(conflicts);
@@ -98,6 +115,7 @@ public sealed record ExportPrecheckResult
         return new(
             plan,
             conflicts,
+            summary,
             isEmptyRange: false,
             ExportFailure.None,
             $"导出前检查发现 {conflicts.Count} 处文件系统冲突，已禁止导出：请先在仓库里处理下列问题，再重新导出。",
@@ -117,6 +135,6 @@ public sealed record ExportPrecheckResult
 
         ArgumentException.ThrowIfNullOrWhiteSpace(failureMessage);
 
-        return new(null, conflicts: null, isEmptyRange: false, failure, failureMessage, technicalDetail);
+        return new(null, conflicts: null, summary: null, isEmptyRange: false, failure, failureMessage, technicalDetail);
     }
 }
