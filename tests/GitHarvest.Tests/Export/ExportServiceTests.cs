@@ -1,5 +1,6 @@
 using GitHarvest.Core.Export;
 using GitHarvest.Core.Git;
+using GitHarvest.Tests.Support;
 
 namespace GitHarvest.Tests.Export;
 
@@ -103,61 +104,11 @@ public sealed class ExportServiceTests
         Assert.Equal(0, result.Summary.TotalCount);
     }
 
-    private static ExportService CreateService(FakeGitService git) => new(git);
+    private static readonly Serilog.ILogger SilentLogger =
+        new Serilog.LoggerConfiguration().CreateLogger();
+
+    private static ExportService CreateService(FakeGitService git) => new(git, SilentLogger);
 
     private static ChangedFile Make(ChangeKind kind, string path)
         => new(path, null, kind, OtherChangeReason.None, 1, 1, null, 10, null, null);
-
-    /// <summary>IGitService 的手写桩：返回预置结论并记录调用，供编排测试断言门控。</summary>
-    private sealed class FakeGitService : IGitService
-    {
-        public bool? IsAncestor { get; init; }
-
-        public (CommitListFailure Failure, string Message)? CheckFailure { get; init; }
-
-        public (CommitListFailure Failure, string Message)? RangeFailure { get; init; }
-
-        public IReadOnlyList<ChangedFile> Files { get; init; } = [];
-
-        public string? RequestedBaseHash { get; private set; }
-
-        public string? RequestedHeadHash { get; private set; }
-
-        public bool RangeRequested { get; private set; }
-
-        public Task<RepositoryOpenResult> OpenRepositoryAsync(string repositoryPath, CancellationToken cancellationToken = default)
-            => throw new NotSupportedException("预览编排不应调用打开仓库。");
-
-        public Task<BranchListResult> GetBranchesAsync(string repositoryPath, CancellationToken cancellationToken = default)
-            => throw new NotSupportedException("预览编排不应调用分支读取。");
-
-        public Task<FetchResult> FetchAsync(string repositoryPath, CancellationToken cancellationToken = default)
-            => throw new NotSupportedException("预览编排不应调用拉取。");
-
-        public Task<CommitListResult> GetCommitsAsync(string repositoryPath, string reference, CommitQuery query, CancellationToken cancellationToken = default)
-            => throw new NotSupportedException("预览编排不应调用提交列表。");
-
-        public Task<CommitDetailResult> GetCommitDetailAsync(string repositoryPath, string hash, CancellationToken cancellationToken = default)
-            => throw new NotSupportedException("预览编排不应调用提交详情。");
-
-        public Task<AncestorCheckResult> CheckAncestorAsync(string repositoryPath, string baseHash, string headHash, CancellationToken cancellationToken = default)
-        {
-            RequestedBaseHash = baseHash;
-            RequestedHeadHash = headHash;
-            return Task.FromResult(CheckFailure is { } failure
-                ? AncestorCheckResult.Failed(failure.Failure, failure.Message)
-                : AncestorCheckResult.Succeeded(IsAncestor!.Value));
-        }
-
-        public Task<ChangeRangeResult> GetChangeRangeAsync(string repositoryPath, string baseHash, string headHash, CancellationToken cancellationToken = default)
-        {
-            RangeRequested = true;
-            return Task.FromResult(RangeFailure is { } failure
-                ? ChangeRangeResult.Failed(failure.Failure, failure.Message)
-                : ChangeRangeResult.Succeeded(Files));
-        }
-
-        public Task<CommitCountResult> GetRangeCommitCountAsync(string repositoryPath, string baseHash, string headHash, CancellationToken cancellationToken = default)
-            => throw new NotSupportedException("预览编排不应调用范围提交计数。");
-    }
 }

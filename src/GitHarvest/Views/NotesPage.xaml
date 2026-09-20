@@ -2,9 +2,16 @@
     x:Class="GitHarvest.Views.NotesPage"
     xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-    xmlns:controls="clr-namespace:GitHarvest.Controls">
+    xmlns:controls="clr-namespace:GitHarvest.Controls"
+    xmlns:ui="http://schemas.lepo.co/wpfui/2022/xaml">
 
-    <!-- 更新说明页（工作流第 4 步）。本 ticket 只放骨架占位，业务在 ticket 09、10 落地。 -->
+    <!--
+        更新说明页（工作流第 4 步，ticket 09 落地导出链路）。
+        布局对齐原型：标题行 + 步骤条 + 导出状态卡（原型页 4 的 done-hero）+ 更新包结构卡
+        （原型页 4 的「更新包结构」）+ 页脚（更新日期目录与输出路径，右侧是「上一步 / 开始导出」）。
+        更新说明的编辑器留给 ticket 10，本页先放一张说明卡占位。
+        导出中显示进度条与取消；冲突、空范围、失败、取消各有自己的呈现。
+    -->
 
     <Grid>
         <Grid.RowDefinitions>
@@ -18,24 +25,466 @@
             VerticalScrollBarVisibility="Auto">
             <StackPanel Style="{StaticResource PageLayout}">
 
-                <TextBlock Style="{StaticResource PageTitleText}" Text="{Binding CurrentTitle}" />
+                <TextBlock Style="{StaticResource PageTitleText}" Text="{Binding Shell.CurrentTitle}" />
                 <TextBlock Style="{StaticResource PageSubtitleText}" Text="由默认模板生成，导出前可编辑；将随更新包一同输出为「更新说明.md」。" />
 
-                <controls:StepBar Margin="0,20,0,22" />
+                <controls:StepBar Margin="0,20,0,22" DataContext="{Binding Shell}" />
 
-                <Border Style="{StaticResource AppCard}">
+                <!-- 引导卡：未打开仓库或未选定范围 -->
+                <Border Margin="0,0,0,16">
+                    <Border.Style>
+                        <Style BasedOn="{StaticResource AppCard}" TargetType="Border">
+                            <Setter Property="Visibility" Value="Collapsed" />
+                            <Style.Triggers>
+                                <DataTrigger Binding="{Binding ShowGuide}" Value="True">
+                                    <Setter Property="Visibility" Value="Visible" />
+                                </DataTrigger>
+                            </Style.Triggers>
+                        </Style>
+                    </Border.Style>
                     <StackPanel>
-                        <TextBlock Style="{StaticResource SectionHeaderText}" Text="骨架占位" />
+                        <TextBlock Style="{StaticResource SectionHeaderText}" Text="尚未选定变更范围" />
                         <TextBlock
                             Margin="0,6,0,0"
                             Style="{StaticResource HintText}"
-                            Text="本页尚无业务功能。计划落地内容：默认模板生成的更新说明、左右双栏实时预览、占位符插入与「重置为模板」，以及最终导出更新包（ticket 09、10）。" />
+                            Text="请先在「选择提交」页选定基准提交与 Head 提交，再回到这里导出更新包。" />
+                        <ui:Button
+                            Margin="0,14,0,0"
+                            HorizontalAlignment="Left"
+                            Command="{Binding GoToPickCommitsCommand}"
+                            Content="返回：选择提交"
+                            Style="{StaticResource AppSecondaryButton}" />
+                    </StackPanel>
+                </Border>
+
+                <!-- 一次性警告：输出路径落在仓库工作区内（本会话只提示一次，可继续） -->
+                <Border Margin="0,0,0,16">
+                    <Border.Style>
+                        <Style BasedOn="{StaticResource AppWarningBanner}" TargetType="Border">
+                            <Setter Property="Visibility" Value="Collapsed" />
+                            <Style.Triggers>
+                                <DataTrigger Binding="{Binding NeedsInsideRepositoryWarning}" Value="True">
+                                    <Setter Property="Visibility" Value="Visible" />
+                                </DataTrigger>
+                            </Style.Triggers>
+                        </Style>
+                    </Border.Style>
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto" />
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+                        <ui:SymbolIcon
+                            Grid.Column="0"
+                            Margin="0,0,10,0"
+                            VerticalAlignment="Top"
+                            FontSize="16"
+                            Foreground="{StaticResource AppWarnTextBrush}"
+                            Symbol="Warning24" />
+                        <TextBlock Grid.Column="1" Style="{StaticResource AppWarningText}" Text="输出路径位于当前仓库的工作区内，更新包会出现在 git status 里；可以继续导出，同一会话内不再提示。" />
+                        <StackPanel
+                            Grid.Column="2"
+                            Margin="14,0,0,0"
+                            VerticalAlignment="Center"
+                            Orientation="Horizontal">
+                            <ui:Button
+                                Command="{Binding ContinueAfterWarningCommand}"
+                                Content="仍然导出"
+                                Style="{StaticResource AppPrimaryButton}" />
+                            <ui:Button
+                                Margin="8,0,0,0"
+                                Command="{Binding CancelWarningCommand}"
+                                Content="取消"
+                                Style="{StaticResource AppSecondaryButton}" />
+                        </StackPanel>
+                    </Grid>
+                </Border>
+
+                <!-- 文件系统冲突：中止导出并列出完整清单（用户故事 32） -->
+                <Border Margin="0,0,0,16">
+                    <Border.Style>
+                        <Style BasedOn="{StaticResource AppCard}" TargetType="Border">
+                            <Setter Property="Visibility" Value="Collapsed" />
+                            <Style.Triggers>
+                                <DataTrigger Binding="{Binding ShowConflicts}" Value="True">
+                                    <Setter Property="Visibility" Value="Visible" />
+                                </DataTrigger>
+                            </Style.Triggers>
+                        </Style>
+                    </Border.Style>
+                    <StackPanel>
+                        <StackPanel Orientation="Horizontal">
+                            <ui:SymbolIcon
+                                VerticalAlignment="Center"
+                                FontSize="16"
+                                Foreground="{StaticResource AppDangerBrush}"
+                                Symbol="ErrorCircle24" />
+                            <TextBlock
+                                Margin="8,0,0,0"
+                                Style="{StaticResource SectionHeaderText}"
+                                Text="发现文件系统冲突，已中止导出" />
+                        </StackPanel>
+                        <TextBlock
+                            Margin="0,6,0,0"
+                            Style="{StaticResource HintText}"
+                            Text="下列路径无法在 Windows 上安全写出（或会互相覆盖）；请先在仓库里处理，再重新导出。" />
+
+                        <ItemsControl Margin="0,12,0,0" ItemsSource="{Binding Conflicts}">
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate>
+                                    <Border
+                                        Margin="0,0,0,6"
+                                        Padding="12,9"
+                                        Background="{StaticResource AppDangerSoftBrush}"
+                                        CornerRadius="6">
+                                        <TextBlock Style="{StaticResource AppBannerText}" Text="{Binding Description}" />
+                                    </Border>
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+                    </StackPanel>
+                </Border>
+
+                <!-- 导出状态卡（原型页 4 的 done-hero：图标 + 标题 + 副文案 + 进度条 + 状态 chip） -->
+                <Border Margin="0,0,0,16">
+                    <Border.Style>
+                        <Style BasedOn="{StaticResource AppCard}" TargetType="Border">
+                            <Setter Property="Visibility" Value="Collapsed" />
+                            <Style.Triggers>
+                                <DataTrigger Binding="{Binding ShowStatus}" Value="True">
+                                    <Setter Property="Visibility" Value="Visible" />
+                                </DataTrigger>
+                            </Style.Triggers>
+                        </Style>
+                    </Border.Style>
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto" />
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+
+                        <Border
+                            Grid.Column="0"
+                            Width="44"
+                            Height="44"
+                            VerticalAlignment="Top"
+                            CornerRadius="22">
+                            <Border.Style>
+                                <Style TargetType="Border">
+                                    <Setter Property="Background" Value="{StaticResource AppAccentSoftBrush}" />
+                                    <Style.Triggers>
+                                        <DataTrigger Binding="{Binding StatusKind}" Value="Success">
+                                            <Setter Property="Background" Value="{StaticResource AppSuccessSoftBrush}" />
+                                        </DataTrigger>
+                                        <DataTrigger Binding="{Binding StatusKind}" Value="Error">
+                                            <Setter Property="Background" Value="{StaticResource AppDangerSoftBrush}" />
+                                        </DataTrigger>
+                                    </Style.Triggers>
+                                </Style>
+                            </Border.Style>
+                            <ui:SymbolIcon HorizontalAlignment="Center" VerticalAlignment="Center" FontSize="20" Symbol="Save24">
+                                <ui:SymbolIcon.Style>
+                                    <Style TargetType="ui:SymbolIcon">
+                                        <Setter Property="Foreground" Value="{StaticResource AppAccentBrush}" />
+                                        <Style.Triggers>
+                                            <DataTrigger Binding="{Binding StatusKind}" Value="Success">
+                                                <Setter Property="Foreground" Value="{StaticResource AppSuccessBrush}" />
+                                            </DataTrigger>
+                                            <DataTrigger Binding="{Binding StatusKind}" Value="Error">
+                                                <Setter Property="Foreground" Value="{StaticResource AppDangerBrush}" />
+                                            </DataTrigger>
+                                        </Style.Triggers>
+                                    </Style>
+                                </ui:SymbolIcon.Style>
+                            </ui:SymbolIcon>
+                        </Border>
+
+                        <StackPanel
+                            Grid.Column="1"
+                            Margin="14,0,0,0"
+                            VerticalAlignment="Center">
+                            <TextBlock Style="{StaticResource SectionHeaderText}" Text="{Binding StatusTitle}" />
+                            <TextBlock
+                                Margin="0,4,0,0"
+                                Style="{StaticResource HintText}"
+                                Text="{Binding StatusSubtitle}" />
+
+                            <!-- 进度条（原型 .progress：细圆角轨道 + 强调色填充），只在导出中出现 -->
+                            <ProgressBar
+                                Margin="0,10,0,0"
+                                Height="6"
+                                Maximum="100"
+                                Value="{Binding ProgressPercent}">
+                                <ProgressBar.Style>
+                                    <Style TargetType="ProgressBar">
+                                        <Setter Property="Visibility" Value="Collapsed" />
+                                        <Setter Property="Background" Value="{StaticResource AppSurfaceMutedBrush}" />
+                                        <Setter Property="Foreground" Value="{StaticResource AppAccentBrush}" />
+                                        <Setter Property="BorderThickness" Value="0" />
+                                        <Setter Property="Template">
+                                            <Setter.Value>
+                                                <ControlTemplate TargetType="ProgressBar">
+                                                    <Grid x:Name="PART_Track">
+                                                        <Border Background="{TemplateBinding Background}" CornerRadius="3" />
+                                                        <Border
+                                                            x:Name="PART_Indicator"
+                                                            HorizontalAlignment="Left"
+                                                            Background="{TemplateBinding Foreground}"
+                                                            CornerRadius="3" />
+                                                    </Grid>
+                                                </ControlTemplate>
+                                            </Setter.Value>
+                                        </Setter>
+                                        <Style.Triggers>
+                                            <DataTrigger Binding="{Binding IsExporting}" Value="True">
+                                                <Setter Property="Visibility" Value="Visible" />
+                                            </DataTrigger>
+                                        </Style.Triggers>
+                                    </Style>
+                                </ProgressBar.Style>
+                            </ProgressBar>
+                        </StackPanel>
+
+                        <StackPanel
+                            Grid.Column="2"
+                            Margin="14,0,0,0"
+                            VerticalAlignment="Center">
+                            <TextBlock HorizontalAlignment="Right" Text="{Binding StatusChip}">
+                                <TextBlock.Style>
+                                    <Style BasedOn="{StaticResource HintText}" TargetType="TextBlock">
+                                        <Setter Property="Foreground" Value="{StaticResource AppAccentBrush}" />
+                                        <Style.Triggers>
+                                            <DataTrigger Binding="{Binding StatusKind}" Value="Success">
+                                                <Setter Property="Foreground" Value="{StaticResource AppSuccessBrush}" />
+                                            </DataTrigger>
+                                            <DataTrigger Binding="{Binding StatusKind}" Value="Error">
+                                                <Setter Property="Foreground" Value="{StaticResource AppDangerBrush}" />
+                                            </DataTrigger>
+                                        </Style.Triggers>
+                                    </Style>
+                                </TextBlock.Style>
+                            </TextBlock>
+
+                            <!-- 导出中：取消（Core 会中断 git 进程并清理半成品目录） -->
+                            <ui:Button
+                                Margin="0,8,0,0"
+                                HorizontalAlignment="Right"
+                                Command="{Binding CancelExportCommand}"
+                                Content="取消导出">
+                                <ui:Button.Style>
+                                    <Style BasedOn="{StaticResource AppSecondaryButton}" TargetType="ui:Button">
+                                        <Setter Property="Visibility" Value="Collapsed" />
+                                        <Style.Triggers>
+                                            <DataTrigger Binding="{Binding IsExporting}" Value="True">
+                                                <Setter Property="Visibility" Value="Visible" />
+                                            </DataTrigger>
+                                        </Style.Triggers>
+                                    </Style>
+                                </ui:Button.Style>
+                            </ui:Button>
+
+                            <!-- 导出完成：打开输出文件夹（用户故事 35） -->
+                            <ui:Button
+                                Margin="0,8,0,0"
+                                HorizontalAlignment="Right"
+                                Command="{Binding OpenOutputFolderCommand}"
+                                Content="打开输出文件夹">
+                                <ui:Button.Style>
+                                    <Style BasedOn="{StaticResource AppPrimaryButton}" TargetType="ui:Button">
+                                        <Setter Property="Visibility" Value="Collapsed" />
+                                        <Style.Triggers>
+                                            <DataTrigger Binding="{Binding ShowOpenOutputFolder}" Value="True">
+                                                <Setter Property="Visibility" Value="Visible" />
+                                            </DataTrigger>
+                                        </Style.Triggers>
+                                    </Style>
+                                </ui:Button.Style>
+                            </ui:Button>
+                        </StackPanel>
+                    </Grid>
+                </Border>
+
+                <!-- 更新包结构卡（原型页 4 的「更新包结构」）：固定含两个快照文件夹与更新说明 -->
+                <Border Margin="0,0,0,16">
+                    <Border.Style>
+                        <Style BasedOn="{StaticResource AppCard}" TargetType="Border">
+                            <Setter Property="Visibility" Value="Collapsed" />
+                            <Style.Triggers>
+                                <DataTrigger Binding="{Binding HasStructure}" Value="True">
+                                    <Setter Property="Visibility" Value="Visible" />
+                                </DataTrigger>
+                            </Style.Triggers>
+                        </Style>
+                    </Border.Style>
+                    <StackPanel>
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+                            <TextBlock
+                                Grid.Column="0"
+                                Style="{StaticResource SectionHeaderText}"
+                                Text="更新包结构" />
+                            <TextBlock
+                                Grid.Column="1"
+                                Style="{StaticResource HintText}"
+                                Text="{Binding FolderName, StringFormat='更新包 / {0}'}" />
+                        </Grid>
+
+                        <StackPanel Margin="0,12,0,0">
+                            <TextBlock Style="{StaticResource BodyText}">
+                                <Run Text="更新前：" />
+                                <Run FontWeight="SemiBold" Text="{Binding BeforeFileCount, Mode=OneWay}" />
+                                <Run Text=" 个文件 · 旧版本快照" />
+                                <Run Text="{Binding DeletedFileNote, Mode=OneWay}" />
+                            </TextBlock>
+                            <TextBlock Margin="0,6,0,0" Style="{StaticResource BodyText}">
+                                <Run Text="更新后：" />
+                                <Run FontWeight="SemiBold" Text="{Binding AfterFileCount, Mode=OneWay}" />
+                                <Run Text=" 个文件 · 新版本快照" />
+                                <Run Text="{Binding AddedFileNote, Mode=OneWay}" />
+                            </TextBlock>
+                            <TextBlock
+                                Margin="0,6,0,0"
+                                Style="{StaticResource BodyText}"
+                                Text="更新说明.md" />
+                            <TextBlock
+                                Margin="0,8,0,0"
+                                Style="{StaticResource HintText}"
+                                Text="{Binding RangeText, StringFormat='变更范围 {0}；「新增」只进「更新后」，「删除」只进「更新前」'}" />
+                        </StackPanel>
+                    </StackPanel>
+                </Border>
+
+                <!-- 更新说明编辑器占位（ticket 10 落地） -->
+                <Border Margin="0,0,0,16" Style="{StaticResource AppCard}">
+                    <StackPanel>
+                        <TextBlock Style="{StaticResource SectionHeaderText}" Text="更新说明编辑器" />
+                        <TextBlock
+                            Margin="0,6,0,0"
+                            Style="{StaticResource HintText}"
+                            Text="本 ticket 先用自动生成的默认内容（随更新包写出为「更新说明.md」）；左右双栏编辑、占位符插入与「重置为模板」在 ticket 10 落地。" />
                     </StackPanel>
                 </Border>
 
             </StackPanel>
         </ScrollViewer>
 
-        <controls:WorkflowFooter Grid.Row="1" Margin="30,0,30,26" />
+        <!-- 完成提示浮层（用户故事 35：看到提示并可一键打开输出目录） -->
+        <Border
+            Grid.RowSpan="2"
+            Background="#66000000"
+            Visibility="{Binding ShowCompletionPrompt, Converter={StaticResource AppBooleanToVisibilityConverter}}">
+            <Border
+                Width="560"
+                Padding="26,24"
+                HorizontalAlignment="Center"
+                Style="{StaticResource AppCard}"
+                VerticalAlignment="Center">
+                <StackPanel>
+                    <StackPanel Orientation="Horizontal">
+                        <Border
+                            Width="40"
+                            Height="40"
+                            VerticalAlignment="Center"
+                            Background="{StaticResource AppSuccessSoftBrush}"
+                            CornerRadius="20">
+                            <ui:SymbolIcon
+                                HorizontalAlignment="Center"
+                                VerticalAlignment="Center"
+                                FontSize="18"
+                                Foreground="{StaticResource AppSuccessBrush}"
+                                Symbol="Checkmark24" />
+                        </Border>
+                        <StackPanel Margin="12,0,0,0" VerticalAlignment="Center">
+                            <TextBlock Style="{StaticResource SectionHeaderText}" Text="更新包导出完成" />
+                            <TextBlock
+                                Margin="0,4,0,0"
+                                Style="{StaticResource HintText}"
+                                Text="{Binding StatusSubtitle}" />
+                        </StackPanel>
+                    </StackPanel>
+
+                    <StackPanel
+                        Margin="0,20,0,0"
+                        HorizontalAlignment="Right"
+                        Orientation="Horizontal">
+                        <ui:Button
+                            Command="{Binding OpenOutputFolderCommand}"
+                            Content="打开输出文件夹"
+                            Style="{StaticResource AppPrimaryButton}" />
+                        <ui:Button
+                            Margin="8,0,0,0"
+                            Command="{Binding DismissCompletionPromptCommand}"
+                            Content="关闭"
+                            Style="{StaticResource AppSecondaryButton}" />
+                    </StackPanel>
+                </StackPanel>
+            </Border>
+        </Border>
+
+        <controls:WorkflowFooter
+            Grid.Row="1"
+            Margin="30,0,30,26"
+            DataContext="{Binding Shell}">
+            <controls:WorkflowFooter.LeftContent>
+                <StackPanel Orientation="Horizontal">
+                    <ui:SymbolIcon
+                        VerticalAlignment="Center"
+                        FontSize="16"
+                        Foreground="{StaticResource AppAccentBrush}"
+                        Symbol="Folder24" />
+
+                    <StackPanel Margin="12,0,0,0" VerticalAlignment="Center">
+                        <StackPanel Orientation="Horizontal">
+                            <TextBlock
+                                VerticalAlignment="Center"
+                                FontSize="12"
+                                Foreground="{DynamicResource TextFillColorTertiaryBrush}"
+                                Text="更新日期目录" />
+                            <ui:TextBox
+                                Width="170"
+                                Margin="8,0,0,0"
+                                Padding="10,5,10,5"
+                                VerticalContentAlignment="Center"
+                                FocusVisualStyle="{x:Null}"
+                                FontSize="13"
+                                Text="{Binding DataContext.FolderName, RelativeSource={RelativeSource AncestorType=Page}, UpdateSourceTrigger=PropertyChanged}">
+                                <ui:TextBox.Style>
+                                    <Style BasedOn="{StaticResource {x:Type ui:TextBox}}" TargetType="ui:TextBox">
+                                        <Style.Triggers>
+                                            <DataTrigger Binding="{Binding DataContext.IsExporting, RelativeSource={RelativeSource AncestorType=Page}}" Value="True">
+                                                <Setter Property="IsEnabled" Value="False" />
+                                            </DataTrigger>
+                                        </Style.Triggers>
+                                    </Style>
+                                </ui:TextBox.Style>
+                            </ui:TextBox>
+                            <TextBlock
+                                Margin="10,0,0,0"
+                                VerticalAlignment="Center"
+                                FontSize="12"
+                                Foreground="{DynamicResource TextFillColorTertiaryBrush}"
+                                Text="· 输出至（按仓库记住）" />
+                            <TextBlock
+                                Margin="8,0,0,0"
+                                VerticalAlignment="Center"
+                                FontSize="12"
+                                Foreground="{StaticResource AppDangerBrush}"
+                                Text="{Binding DataContext.FolderNameError, RelativeSource={RelativeSource AncestorType=Page}}" />
+                        </StackPanel>
+                        <TextBlock
+                            Margin="0,2,0,0"
+                            MaxWidth="420"
+                            Style="{StaticResource MonospaceText}"
+                            Text="{Binding DataContext.OutputPathDisplay, RelativeSource={RelativeSource AncestorType=Page}}"
+                            TextTrimming="CharacterEllipsis" />
+                    </StackPanel>
+                </StackPanel>
+            </controls:WorkflowFooter.LeftContent>
+        </controls:WorkflowFooter>
     </Grid>
 </Page>

@@ -502,7 +502,7 @@ public sealed class PreviewFileItem
         Path = file.Path;
         OldPath = file.OldPath;
         Kind = file.Kind;
-        KindTitle = KindTitles[file.Kind];
+        KindTitle = KindTitleOf(file.Kind);
         hasLineCounts = file.HasLineCounts;
         additions = file.Additions;
         deletions = file.Deletions;
@@ -519,26 +519,11 @@ public sealed class PreviewFileItem
     private readonly int? additions;
     private readonly int? deletions;
 
-    /// <summary>五类变更的徽章文字（与分组标题一致）。</summary>
-    private static readonly IReadOnlyDictionary<ChangeKind, string> KindTitles = new Dictionary<ChangeKind, string>
-    {
-        [ChangeKind.Added] = "新增",
-        [ChangeKind.Deleted] = "删除",
-        [ChangeKind.Modified] = "修改",
-        [ChangeKind.Renamed] = "重命名",
-        [ChangeKind.Other] = "其他",
-    };
+    /// <summary>五类变更的徽章文字（与分组标题、更新说明同一来源，见 <see cref="ChangeKindTitles"/>）。</summary>
+    private static string KindTitleOf(ChangeKind kind) => ChangeKindTitles.For(kind);
 
-    /// <summary>「其他」类的具体原因文案（spec 用户故事 28：在清单中可见）。</summary>
-    private static readonly IReadOnlyDictionary<OtherChangeReason, string> OtherReasonTitles = new Dictionary<OtherChangeReason, string>
-    {
-        [OtherChangeReason.TypeChange] = "类型变更",
-        [OtherChangeReason.Copied] = "复制",
-        [OtherChangeReason.Unmerged] = "未合并",
-        [OtherChangeReason.SubmodulePointer] = "子模块指针",
-        [OtherChangeReason.Unknown] = "未知变更",
-        [OtherChangeReason.None] = string.Empty,
-    };
+    /// <summary>「其他」类的具体原因文案（spec 用户故事 28：在清单中可见；来源同上）。</summary>
+    private static string OtherReasonTitleOf(OtherChangeReason reason) => ChangeKindTitles.For(reason);
 
     /// <summary>当前路径（仓库相对，重命名 / 复制为新路径）。</summary>
     public string Path { get; }
@@ -592,7 +577,7 @@ public sealed class PreviewFileItem
     private static string BuildDeltaNote(ChangedFile file) => file.Kind switch
     {
         ChangeKind.Renamed => file.SimilarityPercent is { } similarity ? $"相似度 {similarity}%" : string.Empty,
-        ChangeKind.Other => OtherReasonTitles[file.OtherReason],
+        ChangeKind.Other => OtherReasonTitleOf(file.OtherReason),
         _ when file.Additions is null && file.Deletions is null => "二进制",
         _ => string.Empty,
     };

@@ -686,11 +686,84 @@ public sealed class GitService : IGitService
         return CommitCountResult.Succeeded(count);
     }
 
-    /// <summary>把范围计算的某一步 git 失败归类成结果对象（引用不存在单独提示）。</summary>
+    /// <inheritdoc />
+    public async Task<BlobCopyResult> CopyBlobToAsync(
+        string repositoryPath,
+        string blobHash,
+        Stream destination,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(repositoryPath);
+        ArgumentException.ThrowIfNullOrWhiteSpace(blobHash);
+        ArgumentNullException.ThrowIfNull(destination);
+
+        if (!Directory.Exists(repositoryPath))
+        {
+            _logger.Warning("读取文件内容失败，目录不存在：{RepositoryPath}", repositoryPath);
+            return BlobCopyResult.Failed(
+                CommitListFailure.DirectoryNotFound,
+                $"仓库目录不存在：{repositoryPath}");
+        }
+
+        var status = await _gitEnvironment.GetStatusAsync(cancellationToken).ConfigureAwait(false);
+        if (!status.IsAvailable || status.ExecutablePath is not { } gitPath)
+        {
+            return BlobCopyResult.Failed(
+                CommitListFailure.GitUnavailable,
+                "Git 尚未就绪，无法读取文件内容：请先按首页引导安装或配置 Git。");
+        }
+
+        // cat-file blob 把 blob 内容原样打到标准输出：这里走「按字节写流」的调用路径，
+        // 不经文本解码，二进制文件的快照才不会在非法字节处被替换。
+        var copy = await _runner.RunToStreamAsync(
+            new GitInvocation(gitPath, ["cat-file", "blob", blobHash], repositoryPath),
+            destination,
+            cancellationToken).ConfigureAwait(false);
+
+        if (!copy.IsSuccess)
+        {
+            var (failure, message) = ClassifyBlobFailure(blobHash, copy);
+            return BlobCopyResult.Failed(failure, message, copy.StandardError.Trim());
+        }
+
+        return BlobCopyResult.Succeeded();
+    }
+
+    /// <summary>
+    /// 把范围计算的某一步 git 失败归类成结果对象（引用不存在单独提示）。
+    /// </summary>
     private ChangeRangeResult FailRange(string baseHash, string headHash, GitCommandResult result)
     {
         var (failure, message) = ClassifyRangeFailure($"{baseHash}..{headHash}", result, "计算变更范围");
         return ChangeRangeResult.Failed(failure, message, result.StandardError.Trim());
+    }
+
+    /// <summary>
+    /// 归类取 blob 内容的失败。实测：对象不存在与「对象不是文件内容」（例如把子模块指针
+    /// 指向的提交交给 cat-file）都报 <c>fatal: git cat-file &lt;hash&gt;: bad file</c>（退出码 128），
+    /// 与 merge-base / diff 的报法不同，因此单独收敛这一次。
+    /// </summary>
+    private (CommitListFailure Failure, string Message) ClassifyBlobFailure(string blobHash, GitCommandResult result)
+    {
+        var stderr = result.StandardError.Trim();
+
+        if (stderr.Contains("bad file", StringComparison.OrdinalIgnoreCase))
+        {
+            _logger.Warning("读取文件内容失败，对象不存在或不是文件内容：{BlobHash}", blobHash);
+            return (
+                CommitListFailure.UnknownReference,
+                $"仓库里找不到文件内容对象 {blobHash}：仓库可能不完整（浅克隆或对象缺失），无法导出该文件的快照。");
+        }
+
+        _logger.Warning(
+            "读取文件内容失败（对象 {BlobHash}，退出码 {ExitCode}）：{StandardError}",
+            blobHash,
+            result.ExitCode,
+            stderr);
+
+        return (
+            CommitListFailure.GitError,
+            $"读取文件内容时 Git 返回错误（退出码 {result.ExitCode}），详情请查看日志。");
     }
 
     /// <summary>

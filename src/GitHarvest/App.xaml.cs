@@ -91,11 +91,16 @@ public partial class App : Application
         services.AddSingleton<IGitService, GitService>();
         services.AddSingleton<IExportService, ExportService>();
 
-        // 壳向 ViewModel 提供的交互接缝：文件夹选择对话框（接口定义在 Core，见 IFolderPicker）
+        // 壳向 ViewModel 提供的交互接缝：文件夹选择对话框与「打开输出文件夹」
+        // （接口定义在 Core，见 IFolderPicker / IFolderOpener）
         services.AddSingleton<IFolderPicker, FolderPicker>();
+        services.AddSingleton<IFolderOpener, FolderOpener>();
 
         // 当前打开的仓库会话状态（ticket 06：仓库页写入，选择提交等后续步骤读取）
         services.AddSingleton<IRepositorySession, RepositorySession>();
+
+        // 会话级的一次性警告门（用户故事 33：同一会话内只提示一次）
+        services.AddSingleton<IExportWarningGate, ExportWarningGate>();
 
         // 外壳与导航
         services.AddSingleton<ShellViewModel>();
@@ -110,6 +115,7 @@ public partial class App : Application
         services.AddTransient<PickCommitsPage>();
         services.AddTransient<PreviewViewModel>();
         services.AddTransient<PreviewPage>();
+        services.AddTransient<NotesViewModel>();
         services.AddTransient<NotesPage>();
         services.AddTransient<SettingsPage>();
         services.AddTransient<AboutPage>();

@@ -6,6 +6,8 @@
     <UseWPF>true</UseWPF>
     <RootNamespace>GitHarvest</RootNamespace>
     <AssemblyName>GitHarvest</AssemblyName>
+    <!-- 应用清单：声明长路径支持（ticket 09 的验收项）。文件里刻意只加 longPathAware，理由见其注释。 -->
+    <ApplicationManifest>app.manifest</ApplicationManifest>
   </PropertyGroup>
 
   <ItemGroup>

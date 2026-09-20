@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="utf-8"?>
+<assembly xmlns="urn:schemas-microsoft-com:asm.v1" manifestVersion="1.0">
+
+  <!--
+    只加 longPathAware 一项：.NET 默认清单（asInvoker、无 DPI 声明）保持不变——
+    清单里一旦声明 dpiAware/dpiAwareness 就以清单为准，会改变 WPF 运行时自设的 DPI 行为；
+    supportedOS 会改变版本仿真，与本工具无关，故都不加。
+    longPathAware 声明应用能处理超过 260 字符的路径（系统开启 LongPathsEnabled 后生效）；
+    导出包仍按经典上限预检（见 FileSystemConflictScanner），因为交付包由用户的工具链使用。
+  -->
+
+  <assemblyIdentity version="1.0.0.0" name="GitHarvest.app" />
+
+  <trustInfo xmlns="urn:schemas-microsoft-com:asm.v2">
+    <security>
+      <requestedPrivileges xmlns="urn:schemas-microsoft-com:asm.v3">
+        <requestedExecutionLevel level="asInvoker" uiAccess="false" />
+      </requestedPrivileges>
+    </security>
+  </trustInfo>
+
+  <application xmlns="urn:schemas-microsoft-com:asm.v3">
+    <windowsSettings>
+      <longPathAware xmlns="http://schemas.microsoft.com/SMI/2016/WindowsSettings">true</longPathAware>
+    </windowsSettings>
+  </application>
+
+</assembly>

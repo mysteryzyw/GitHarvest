@@ -130,4 +130,23 @@ public interface IGitService
         string baseHash,
         string headHash,
         CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// 把一个 blob 的内容原样写入 <paramref name="destination"/>，供导出编排写出
+    /// 「更新前 / 更新后」快照（用户故事 24：导出的是完整文件快照而不是 diff 补丁）。
+    /// 内容按**原始字节**拷贝、不做任何编码转换（二进制文件同样正确），也不整体读进内存。
+    /// 子模块指针（gitlink）的哈希指向另一个仓库的提交、不是本仓库的 blob，
+    /// 调用方不应把它交给本方法（落在导出侧的责任由 <c>SnapshotPlanner</c> 承担）。
+    /// </summary>
+    /// <param name="repositoryPath">仓库目录（仓库根或其子目录）。</param>
+    /// <param name="blobHash">blob 完整哈希（来自 <see cref="ChangedFile.OldBlobHash"/> / <see cref="ChangedFile.NewBlobHash"/>）。</param>
+    /// <param name="destination">内容落点流；本方法不关闭它，生命周期由调用方管理。</param>
+    /// <param name="cancellationToken">取消令牌；取消时终止正在执行的 git 进程。</param>
+    /// <returns>取内容的结果；失败不抛异常，且失败时目标流可能已有半截内容（清理口径由调用方定）。</returns>
+    /// <exception cref="OperationCanceledException">令牌已取消，或执行过程中被取消。</exception>
+    Task<BlobCopyResult> CopyBlobToAsync(
+        string repositoryPath,
+        string blobHash,
+        Stream destination,
+        CancellationToken cancellationToken = default);
 }
