@@ -245,6 +245,73 @@ public sealed class GetCommitsTests : IDisposable
     }
 
     [Fact]
+    public async Task 合并历史的列表按拓扑序分行聚集且对照git的拓扑序输出一致()
+    {
+        // 合并提交会让两条线同时进入历史：按日期倒排（git log 默认）会**交错**两条线的提交，
+        // 读起来分不清哪个提交属于哪条线、谁在谁之后；拓扑序把同一线的提交聚在一起
+        // （父提交恒在子提交之后）。列表与 merge-base 的祖先结论口径一致，避免第 2 步误判祖先关系。
+        // fixture 用 fast-import 一次造出（时间戳刻意交错：侧线 B2 晚于主线 C2）。
+        var repositoryPath = Path.Combine(_directory.Path, "topo-order");
+        Directory.CreateDirectory(repositoryPath);
+        await TestGit.RunAsync(["init", "-q", "-b", "main", repositoryPath]);
+        await TestGit.RunWithStdinAsync(
+            ["fast-import", "--quiet"],
+            BuildInterleavedHistoryStream(),
+            repositoryPath);
+
+        // 期望顺序由 git 自己的拓扑序给出（交叉验证，不硬编码 git 的分线先后）。
+        var expected = await ReadLogSubjectsAsync(repositoryPath, "main");
+        Assert.Equal("M 合并", expected[0]); // 分支 tip 仍在最前（Head 栏自动选中第一条的前提）
+
+        var page = await CreateService().GetCommitsAsync(
+            repositoryPath, "main", new CommitQuery(Search: null, Offset: 0, Limit: 10));
+
+        Assert.True(page.IsSuccess);
+        Assert.Equal(expected, page.Commits!.Select(c => c.Subject));
+        // 默认日期序会把 C2、B2、B1、C1 交错（M, C2, B2, B1, C1, A）——这里必须是拓扑序。
+        Assert.NotEqual(
+            ["M 合并", "C2 主线", "B2 侧线", "B1 侧线", "C1 主线", "A 根"],
+            page.Commits!.Select(c => c.Subject));
+    }
+
+    /// <summary>
+    /// 构造「两条线时间戳交错」的合并历史（fast-import 流）：
+    /// A → C1(主线) → C2(主线) → M(合并)；A → B1(侧线) → B2(侧线)，B2 的提交时间晚于 C2。
+    /// 日期倒排会得到 M, C2, B2, B1, C1, A（两条线交错），拓扑序则把侧线聚成一组。
+    /// 标记必须是数字（fast-import 的 mark 语法）；data 长度按 UTF-8 字节计。
+    /// </summary>
+    private static string BuildInterleavedHistoryStream()
+    {
+        var builder = new System.Text.StringBuilder();
+        Append("A 根", 1, 1600000000, "main");
+        Append("C1 主线", 2, 1600001000, "main", from: 1);
+        Append("B1 侧线", 3, 1600002000, "side", from: 1);
+        Append("C2 主线", 4, 1600003000, "main", from: 2);
+        Append("B2 侧线", 5, 1600002500, "side", from: 3);
+        Append("M 合并", 6, 1600004000, "main", from: 4, merge: 5);
+        return builder.ToString();
+
+        void Append(string subject, int mark, long time, string branch, int? from = null, int? merge = null)
+        {
+            var subjectBytes = System.Text.Encoding.UTF8.GetByteCount(subject);
+            builder.Append("commit refs/heads/").Append(branch).Append('\n');
+            builder.Append("mark :").Append(mark).Append('\n');
+            builder.Append("author 交付测试 <test@githarvest.local> ").Append(time).Append(" +0800\n");
+            builder.Append("committer 交付测试 <test@githarvest.local> ").Append(time).Append(" +0800\n");
+            builder.Append("data ").Append(subjectBytes).Append('\n').Append(subject).Append('\n');
+            if (from is { } parent)
+            {
+                builder.Append("from :").Append(parent).Append('\n');
+            }
+
+            if (merge is { } merged)
+            {
+                builder.Append("merge :").Append(merged).Append('\n');
+            }
+        }
+    }
+
+    [Fact]
     public async Task 数千提交的仓库分页枚举保持正确()
     {
         // 验收场景「含数千提交的 fixture 仓库」：git fast-import 一次进程造 2000 个提交，
@@ -333,10 +400,10 @@ public sealed class GetCommitsTests : IDisposable
         return result.StandardOutput;
     }
 
-    /// <summary>用独立的 git log 读取全部提交信息首行（新→旧），作为期望顺序。</summary>
+    /// <summary>用独立的 git log 读取全部提交信息首行（新→旧，**拓扑序**——与列表同一排序），作为期望顺序。</summary>
     private async Task<IReadOnlyList<string>> ReadLogSubjectsAsync(string repositoryPath, string reference)
     {
-        var output = await ReadGitOutputAsync(repositoryPath, ["log", "--format=%s", reference]);
+        var output = await ReadGitOutputAsync(repositoryPath, ["log", "--topo-order", "--format=%s", reference]);
         return [.. output.Split('\n', StringSplitOptions.RemoveEmptyEntries)];
     }
 }

@@ -321,8 +321,12 @@ public sealed class GitService : IGitService
         // 列表项与分支 Tip 同一组字段（复用 CommitSummary）：短哈希/信息首行/作者/作者时间。
         // 字段间 %00 分隔、按行切记录——%(subject) 只有信息首行不含换行，字段值不可能含 NUL，
         // 中文提交信息与作者不做转义（与分支枚举同一手法）。
+        // --topo-order：合并历史上按日期倒排（git log 默认）会把两条线的提交交错显示，
+        // 读起来分不清谁在谁之后、谁属于哪条线——拓扑序把同一线的提交聚在一起、父提交恒在
+        // 子提交之后，与 merge-base 的祖先结论口径一致（第 2 步选基准/Head 时不会误判祖先关系）。
+        // 分页不受影响：--skip/--max-count 作用在同一份拓扑序结果上。
         const string format = "%h%x00%s%x00%an%x00%aI";
-        var logArguments = new List<string> { "log", $"--format={format}" };
+        var logArguments = new List<string> { "log", "--topo-order", $"--format={format}" };
 
         var search = query.Search?.Trim();
         if (string.IsNullOrEmpty(search))
