@@ -1,4 +1,3 @@
-using System.Diagnostics;
 using GitHarvest.Core.Git;
 using Serilog;
 
@@ -60,7 +59,7 @@ public sealed class CommitSearchCache
 
     /// <summary>
     /// 取整份提交：已就绪直接返回；正在读取则共用同一个任务；否则发起一次全量读取
-    /// （受扫描上限保护，含提交数与耗时日志——用于验证优化效果与仓库规模）。
+    /// （受扫描上限保护）。
     /// 读取失败返回空列表（界面据此显示「没有匹配的提交」），失败原因进日志。
     /// </summary>
     public Task<IReadOnlyList<CommitSummary>> GetOrLoadAsync()
@@ -86,29 +85,26 @@ public sealed class CommitSearchCache
 
     private async Task<IReadOnlyList<CommitSummary>> LoadAsync()
     {
-        var stopwatch = Stopwatch.StartNew();
         var result = await _gitService
             .GetCommitsAsync(_repositoryRoot!, _reference!, new CommitQuery(Search: null, Offset: 0, Limit: ScanLimit))
             .ConfigureAwait(true);
-        stopwatch.Stop();
 
         if (result is not { Commits: { } commits })
         {
-            _logger.Warning(
-                "提交搜索缓存读取失败（耗时 {ElapsedMs} ms）：{FailureMessage}",
-                stopwatch.ElapsedMilliseconds,
-                result.FailureMessage);
+            _logger.Warning("提交搜索缓存读取失败：{FailureMessage}", result.FailureMessage);
             _items = [];
             return _items;
         }
 
-        _logger.Information(
-            "提交搜索缓存就绪：{RepositoryRoot} @ {Reference} 共 {Count} 条，耗时 {ElapsedMs} ms{Truncated}",
-            _repositoryRoot,
-            _reference,
-            commits.Count,
-            stopwatch.ElapsedMilliseconds,
-            result.HasMore ? "（已达扫描上限，更早的提交不参与搜索）" : string.Empty);
+        if (result.HasMore)
+        {
+            // 达到扫描上限：更早的提交不参与搜索，值得留痕（正常仓库不会触发）。
+            _logger.Warning(
+                "提交搜索缓存已达扫描上限（{Count} 条），更早的提交不参与搜索：{RepositoryRoot} @ {Reference}",
+                commits.Count,
+                _repositoryRoot,
+                _reference);
+        }
 
         _items = commits;
         return _items;
