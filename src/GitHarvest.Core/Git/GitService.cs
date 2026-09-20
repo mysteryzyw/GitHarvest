@@ -483,6 +483,252 @@ public sealed class GitService : IGitService
         return CommitDetailResult.Succeeded(detail);
     }
 
+    /// <inheritdoc />
+    public async Task<AncestorCheckResult> CheckAncestorAsync(
+        string repositoryPath,
+        string baseHash,
+        string headHash,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(repositoryPath);
+        ArgumentException.ThrowIfNullOrWhiteSpace(baseHash);
+        ArgumentException.ThrowIfNullOrWhiteSpace(headHash);
+
+        if (!Directory.Exists(repositoryPath))
+        {
+            _logger.Warning("祖先校验失败，目录不存在：{RepositoryPath}", repositoryPath);
+            return AncestorCheckResult.Failed(
+                CommitListFailure.DirectoryNotFound,
+                $"仓库目录不存在：{repositoryPath}");
+        }
+
+        var status = await _gitEnvironment.GetStatusAsync(cancellationToken).ConfigureAwait(false);
+        if (!status.IsAvailable || status.ExecutablePath is not { } gitPath)
+        {
+            return AncestorCheckResult.Failed(
+                CommitListFailure.GitUnavailable,
+                "Git 尚未就绪，无法校验提交关系：请先按首页引导安装或配置 Git。");
+        }
+
+        // git 文档化的约定：--is-ancestor 退出码 0 = 是祖先、1 = 不是祖先、>1 = 出错。
+        // 「不是祖先」（分叉提交对）是校验得到的确定结论，不是失败。
+        var check = await RunGitAsync(
+            gitPath,
+            ["merge-base", "--is-ancestor", baseHash, headHash],
+            repositoryPath,
+            cancellationToken).ConfigureAwait(false);
+
+        if (check.IsSuccess)
+        {
+            return AncestorCheckResult.Succeeded(isAncestor: true);
+        }
+
+        if (check.ExitCode == 1)
+        {
+            _logger.Information(
+                "祖先校验不通过：{RepositoryPath}（{BaseHash} 不是 {HeadHash} 的祖先）",
+                repositoryPath,
+                baseHash,
+                headHash);
+            return AncestorCheckResult.Succeeded(isAncestor: false);
+        }
+
+        var (failure, message) = ClassifyRangeFailure(
+            $"{baseHash}..{headHash}", check, "校验提交祖先关系");
+        return AncestorCheckResult.Failed(failure, message, check.StandardError.Trim());
+    }
+
+    /// <inheritdoc />
+    public async Task<ChangeRangeResult> GetChangeRangeAsync(
+        string repositoryPath,
+        string baseHash,
+        string headHash,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(repositoryPath);
+        ArgumentException.ThrowIfNullOrWhiteSpace(baseHash);
+        ArgumentException.ThrowIfNullOrWhiteSpace(headHash);
+
+        if (!Directory.Exists(repositoryPath))
+        {
+            _logger.Warning("变更范围计算失败，目录不存在：{RepositoryPath}", repositoryPath);
+            return ChangeRangeResult.Failed(
+                CommitListFailure.DirectoryNotFound,
+                $"仓库目录不存在：{repositoryPath}");
+        }
+
+        var status = await _gitEnvironment.GetStatusAsync(cancellationToken).ConfigureAwait(false);
+        if (!status.IsAvailable || status.ExecutablePath is not { } gitPath)
+        {
+            return ChangeRangeResult.Failed(
+                CommitListFailure.GitUnavailable,
+                "Git 尚未就绪，无法计算变更范围：请先按首页引导安装或配置 Git。");
+        }
+
+        // 第一步：原始差异——状态字母（归类依据）+ 两侧模式（子模块判定）+ blob 哈希 + 路径。
+        // -M 显式开启重命名检测（默认 50% 阈值，不受用户 diff.renames 配置影响）；
+        // --no-abbrev 取完整 blob 哈希供导出取快照；-z 规避非 ASCII 路径转义，--no-color
+        // 防 color.ui=always 之类的用户配置往输出里混入转义序列破坏解析。
+        var raw = await RunGitAsync(
+            gitPath,
+            ["diff", "--raw", "-M", "-z", "--no-abbrev", "--no-color", baseHash, headHash],
+            repositoryPath,
+            cancellationToken).ConfigureAwait(false);
+        if (!raw.IsSuccess)
+        {
+            return FailRange(baseHash, headHash, raw);
+        }
+
+        // 第二步：numstat——每文件的 +行数（二进制为 "-" 占位）。与 raw 是同一份差异。
+        var numstat = await RunGitAsync(
+            gitPath,
+            ["diff", "--numstat", "-M", "-z", baseHash, headHash],
+            repositoryPath,
+            cancellationToken).ConfigureAwait(false);
+        if (!numstat.IsSuccess)
+        {
+            return FailRange(baseHash, headHash, numstat);
+        }
+
+        // 第三步：两侧树的大小表（预览展示用）。重命名的旧路径在基准树、新路径在 Head 树，
+        // 所以两棵树都要；ls-tree 对 bare 仓库同样可用（导出只需要提交数据，见 spec）。
+        var sizesAtBase = await RunGitAsync(
+            gitPath,
+            ["ls-tree", "-r", "-l", baseHash],
+            repositoryPath,
+            cancellationToken).ConfigureAwait(false);
+        if (!sizesAtBase.IsSuccess)
+        {
+            return FailRange(baseHash, headHash, sizesAtBase);
+        }
+
+        var sizesAtHead = await RunGitAsync(
+            gitPath,
+            ["ls-tree", "-r", "-l", headHash],
+            repositoryPath,
+            cancellationToken).ConfigureAwait(false);
+        if (!sizesAtHead.IsSuccess)
+        {
+            return FailRange(baseHash, headHash, sizesAtHead);
+        }
+
+        var records = ChangeRangeParser.ParseRaw(raw.StandardOutput);
+        var lineCounts = ChangeRangeParser.ParseNumstat(numstat.StandardOutput);
+        var baseSizes = ChangeRangeParser.ParseTreeSizes(sizesAtBase.StandardOutput);
+        var headSizes = ChangeRangeParser.ParseTreeSizes(sizesAtHead.StandardOutput);
+        if (records is null || lineCounts is null || baseSizes is null || headSizes is null)
+        {
+            _logger.Warning(
+                "Git 的差异输出无法解析：{RepositoryPath}（{BaseHash}..{HeadHash}）",
+                repositoryPath,
+                baseHash,
+                headHash);
+            return ChangeRangeResult.Failed(
+                CommitListFailure.GitError,
+                $"Git 的差异输出无法解析（{baseHash}..{headHash}），详情请查看日志。");
+        }
+
+        var files = ChangeRangeParser.BuildChangedFiles(records, lineCounts, baseSizes, headSizes);
+
+        _logger.Information(
+            "变更范围计算完成：{RepositoryPath}（{BaseHash}..{HeadHash}，共 {Count} 个文件）",
+            repositoryPath,
+            baseHash,
+            headHash,
+            files.Count);
+
+        return ChangeRangeResult.Succeeded(files);
+    }
+
+    /// <inheritdoc />
+    public async Task<CommitCountResult> GetRangeCommitCountAsync(
+        string repositoryPath,
+        string baseHash,
+        string headHash,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(repositoryPath);
+        ArgumentException.ThrowIfNullOrWhiteSpace(baseHash);
+        ArgumentException.ThrowIfNullOrWhiteSpace(headHash);
+
+        if (!Directory.Exists(repositoryPath))
+        {
+            _logger.Warning("范围提交数统计失败，目录不存在：{RepositoryPath}", repositoryPath);
+            return CommitCountResult.Failed(
+                CommitListFailure.DirectoryNotFound,
+                $"仓库目录不存在：{repositoryPath}");
+        }
+
+        var status = await _gitEnvironment.GetStatusAsync(cancellationToken).ConfigureAwait(false);
+        if (!status.IsAvailable || status.ExecutablePath is not { } gitPath)
+        {
+            return CommitCountResult.Failed(
+                CommitListFailure.GitUnavailable,
+                "Git 尚未就绪，无法统计范围提交数：请先按首页引导安装或配置 Git。");
+        }
+
+        // rev-list --count 的双点语义与变更范围一致（含 Head、不含基准）；
+        // 基准与 Head 为同一提交时输出 0（不是失败）。
+        var revList = await RunGitAsync(
+            gitPath,
+            ["rev-list", "--count", $"{baseHash}..{headHash}"],
+            repositoryPath,
+            cancellationToken).ConfigureAwait(false);
+
+        if (!revList.IsSuccess)
+        {
+            var (failure, message) = ClassifyRangeFailure(
+                $"{baseHash}..{headHash}", revList, "统计范围提交数");
+            return CommitCountResult.Failed(failure, message, revList.StandardError.Trim());
+        }
+
+        var count = int.Parse(revList.StandardOutput.Trim(), CultureInfo.InvariantCulture);
+        return CommitCountResult.Succeeded(count);
+    }
+
+    /// <summary>把范围计算的某一步 git 失败归类成结果对象（引用不存在单独提示）。</summary>
+    private ChangeRangeResult FailRange(string baseHash, string headHash, GitCommandResult result)
+    {
+        var (failure, message) = ClassifyRangeFailure($"{baseHash}..{headHash}", result, "计算变更范围");
+        return ChangeRangeResult.Failed(failure, message, result.StandardError.Trim());
+    }
+
+    /// <summary>
+    /// 把祖先校验 / 范围计算的失败归类：引用不存在（哈希打错、对象缺失）单独提示，
+    /// 其余按 Git 错误透出技术细节。merge-base 与 diff 对无效对象的报法不同
+    /// （Not a valid object name / bad object / unknown revision），统一在此收敛。
+    /// </summary>
+    private (CommitListFailure Failure, string Message) ClassifyRangeFailure(
+        string range,
+        GitCommandResult result,
+        string operation)
+    {
+        var stderr = result.StandardError.Trim();
+
+        if (stderr.Contains("unknown revision", StringComparison.OrdinalIgnoreCase) ||
+            stderr.Contains("bad object", StringComparison.OrdinalIgnoreCase) ||
+            stderr.Contains("not a valid object name", StringComparison.OrdinalIgnoreCase) ||
+            stderr.Contains("not a valid commit name", StringComparison.OrdinalIgnoreCase) ||
+            stderr.Contains("invalid revision range", StringComparison.OrdinalIgnoreCase) ||
+            stderr.Contains("ambiguous argument", StringComparison.OrdinalIgnoreCase))
+        {
+            _logger.Warning("{Operation}失败，引用不存在：{Range}", operation, range);
+            return (
+                CommitListFailure.UnknownReference,
+                $"找不到提交「{range}」：该提交哈希在当前仓库中不存在。");
+        }
+
+        _logger.Warning(
+            "Git 命令失败（退出码 {ExitCode}）：{CommandLine}；{StandardError}",
+            result.ExitCode,
+            result.Invocation.CommandLineText,
+            stderr);
+
+        return (
+            CommitListFailure.GitError,
+            $"{operation}时 Git 返回错误（退出码 {result.ExitCode}），详情请查看日志。");
+    }
+
     /// <summary>把 numstat 输出汇总成 diffstat 数字：二进制行（"-" 占位）计入文件数但不计增删行数。</summary>
     private static CommitDiffStat SummarizeNumstat(string output)
     {

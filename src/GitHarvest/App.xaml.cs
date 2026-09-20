@@ -1,6 +1,7 @@
 ﻿using System.Reflection;
 using System.Windows;
 using System.Windows.Media;
+using GitHarvest.Core.Export;
 using GitHarvest.Core.Git;
 using GitHarvest.Core.Infrastructure;
 using GitHarvest.Core.Interaction;
@@ -76,7 +77,7 @@ public partial class App : Application
         services.AddSingleton<ILogger>(Log.Logger);
 
         // Core 服务：导航目录 + git 访问基础设施（ticket 02）+ 设置与 JSON 持久化（ticket 03）
-        // + 仓库级 Git 操作（ticket 04）
+        // + 仓库级 Git 操作（ticket 04）+ 导出编排（ticket 08：导出前总预览起步）
         services.AddSingleton<INavigationCatalog, NavigationCatalog>();
         services.AddSingleton(provider => GitExecutableLocator.ForCurrentEnvironment());
         services.AddSingleton<GitCliRunner>();
@@ -88,6 +89,7 @@ public partial class App : Application
         services.AddSingleton<IGitExecutablePathProvider>(provider => provider.GetRequiredService<ISettingsService>());
         services.AddSingleton<IGitEnvironmentService, GitEnvironmentService>();
         services.AddSingleton<IGitService, GitService>();
+        services.AddSingleton<IExportService, ExportService>();
 
         // 壳向 ViewModel 提供的交互接缝：文件夹选择对话框（接口定义在 Core，见 IFolderPicker）
         services.AddSingleton<IFolderPicker, FolderPicker>();
@@ -106,6 +108,7 @@ public partial class App : Application
         services.AddTransient<RepositoryPage>();
         services.AddTransient<PickCommitsViewModel>();
         services.AddTransient<PickCommitsPage>();
+        services.AddTransient<PreviewViewModel>();
         services.AddTransient<PreviewPage>();
         services.AddTransient<NotesPage>();
         services.AddTransient<SettingsPage>();

@@ -592,6 +592,290 @@
         </Style.Triggers>
     </Style>
 
+    <!-- ==================== 导出前总预览（原型 .stat-card / .f-chip / .group / .f-row / .pill） ==================== -->
+
+    <!-- 布尔 → 可见性转换（组体随展开态显隐等场景） -->
+    <BooleanToVisibilityConverter x:Key="AppBooleanToVisibilityConverter" />
+
+    <!--
+        统计卡（原型 .stat-card）：卡片观感 + 悬停上浮；选中（当前类型过滤）时
+        2px 强调色描边（原型 outline 2px accent, offset -2 的等效画法）。
+        内容（色块 / 类型名 / 数字 / 占比）由页面 DataTemplate 提供。
+    -->
+    <Style x:Key="AppStatCard" TargetType="ToggleButton">
+        <Setter Property="Cursor" Value="Hand" />
+        <Setter Property="Focusable" Value="False" />
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="ToggleButton">
+                    <Border
+                        x:Name="Chrome"
+                        Background="{StaticResource AppCardBackgroundBrush}"
+                        BorderBrush="{StaticResource AppCardBorderBrush}"
+                        BorderThickness="1"
+                        CornerRadius="{StaticResource CardCornerRadius}"
+                        Effect="{StaticResource AppCardShadowEffect}"
+                        Padding="15,17"
+                        SnapsToDevicePixels="True">
+                        <ContentPresenter />
+                    </Border>
+                    <ControlTemplate.Triggers>
+                        <Trigger Property="IsMouseOver" Value="True">
+                            <Setter TargetName="Chrome" Property="Effect" Value="{StaticResource AppCardHoverShadowEffect}" />
+                        </Trigger>
+                        <Trigger Property="IsChecked" Value="True">
+                            <Setter TargetName="Chrome" Property="BorderBrush" Value="{StaticResource AppAccentBrush}" />
+                            <Setter TargetName="Chrome" Property="BorderThickness" Value="2" />
+                            <Setter TargetName="Chrome" Property="Padding" Value="14,16" />
+                        </Trigger>
+                    </ControlTemplate.Triggers>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+    <!-- 类型过滤 chip（原型 .f-chip：高 28、圆角 14、control 底 1px 描边；选中强调色实底白字） -->
+    <Style x:Key="AppFilterChip" TargetType="ToggleButton">
+        <Setter Property="Cursor" Value="Hand" />
+        <Setter Property="Focusable" Value="False" />
+        <Setter Property="Height" Value="28" />
+        <Setter Property="Padding" Value="13,0" />
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="ToggleButton">
+                    <Border
+                        x:Name="Chrome"
+                        Background="{DynamicResource ControlFillColorDefaultBrush}"
+                        BorderBrush="{DynamicResource ControlStrokeColorDefaultBrush}"
+                        BorderThickness="1"
+                        CornerRadius="14"
+                        Padding="{TemplateBinding Padding}"
+                        SnapsToDevicePixels="True">
+                        <ContentPresenter VerticalAlignment="Center" />
+                    </Border>
+                    <ControlTemplate.Triggers>
+                        <Trigger Property="IsMouseOver" Value="True">
+                            <Setter TargetName="Chrome" Property="BorderBrush" Value="#33000000" />
+                        </Trigger>
+                        <Trigger Property="IsChecked" Value="True">
+                            <Setter TargetName="Chrome" Property="Background" Value="{StaticResource AppAccentBrush}" />
+                            <Setter TargetName="Chrome" Property="BorderBrush" Value="Transparent" />
+                            <Setter Property="TextElement.FontWeight" Value="SemiBold" />
+                        </Trigger>
+                    </ControlTemplate.Triggers>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+    <!-- chip 的文字（12.5px 次级色；选中时由内容 DataTrigger 转白，见页面） -->
+    <Style x:Key="AppFilterChipText" TargetType="TextBlock">
+        <Setter Property="FontFamily" Value="{StaticResource AppFontFamily}" />
+        <Setter Property="FontSize" Value="12.5" />
+        <Setter Property="Foreground" Value="{DynamicResource TextFillColorSecondaryBrush}" />
+        <Style.Triggers>
+            <DataTrigger Binding="{Binding IsChecked, RelativeSource={RelativeSource AncestorType=ToggleButton}}" Value="True">
+                <Setter Property="Foreground" Value="{StaticResource AppOnAccentBrush}" />
+            </DataTrigger>
+        </Style.Triggers>
+    </Style>
+
+    <!-- chip 里的计数（原型 .f-chip .cnt：11px、75% 不透明度） -->
+    <Style x:Key="AppFilterChipCount" TargetType="TextBlock" BasedOn="{StaticResource AppFilterChipText}">
+        <Setter Property="FontSize" Value="11" />
+        <Setter Property="Opacity" Value="0.75" />
+    </Style>
+
+    <!-- 分组卡（原型 .group：卡片但无内边距——组头与文件行各自带内边距，行分隔线画到卡缘） -->
+    <Style x:Key="AppGroupCard" TargetType="Border" BasedOn="{StaticResource AppCard}">
+        <Setter Property="Padding" Value="0" />
+    </Style>
+
+    <!--
+        分组头（原型 .group-head）：整行可点（展开 / 收起），12px 16px 内边距，
+        悬停加一层 75% 白提高亮度（原型 background rgba(255,255,255,.75)）。
+    -->
+    <Style x:Key="AppGroupHead" TargetType="ToggleButton">
+        <Setter Property="Cursor" Value="Hand" />
+        <Setter Property="Focusable" Value="False" />
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="ToggleButton">
+                    <Border
+                        x:Name="Chrome"
+                        Background="#73FFFFFF"
+                        Padding="12,12,16,12"
+                        SnapsToDevicePixels="True">
+                        <ContentPresenter />
+                    </Border>
+                    <ControlTemplate.Triggers>
+                        <Trigger Property="IsMouseOver" Value="True">
+                            <Setter TargetName="Chrome" Property="Background" Value="#BFFFFFFF" />
+                        </Trigger>
+                    </ControlTemplate.Triggers>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+    <!--
+        分组头的展开箭头（原型 .group-head .chev）：默认向下（展开态），
+        收起时旋转 -90° 指向右侧，0.15s 过渡与原型一致。
+    -->
+    <Style x:Key="AppGroupChevron" TargetType="ui:SymbolIcon">
+        <Setter Property="FontSize" Value="14" />
+        <Setter Property="Foreground" Value="{DynamicResource TextFillColorTertiaryBrush}" />
+        <Setter Property="RenderTransformOrigin" Value="0.5,0.5" />
+        <Setter Property="RenderTransform">
+            <Setter.Value>
+                <RotateTransform Angle="0" />
+            </Setter.Value>
+        </Setter>
+        <Style.Triggers>
+            <DataTrigger Binding="{Binding IsExpanded}" Value="False">
+                <Setter Property="RenderTransform">
+                    <Setter.Value>
+                        <RotateTransform Angle="-90" />
+                    </Setter.Value>
+                </Setter>
+            </DataTrigger>
+        </Style.Triggers>
+    </Style>
+
+    <!-- 分组头的计数徽章（原型 .g-badge：最小宽 22、高 20、圆角 10、类型浅底 + 主色字） -->
+    <Style x:Key="AppGroupBadge" TargetType="Border">
+        <Setter Property="MinWidth" Value="22" />
+        <Setter Property="Height" Value="20" />
+        <Setter Property="CornerRadius" Value="10" />
+        <Setter Property="Padding" Value="7,0" />
+        <Setter Property="Background" Value="{StaticResource AppTypeAddSoftBrush}" />
+        <Setter Property="SnapsToDevicePixels" Value="True" />
+        <Style.Triggers>
+            <DataTrigger Binding="{Binding Kind}" Value="Deleted">
+                <Setter Property="Background" Value="{StaticResource AppTypeDeleteSoftBrush}" />
+            </DataTrigger>
+            <DataTrigger Binding="{Binding Kind}" Value="Modified">
+                <Setter Property="Background" Value="{StaticResource AppTypeModifySoftBrush}" />
+            </DataTrigger>
+            <DataTrigger Binding="{Binding Kind}" Value="Renamed">
+                <Setter Property="Background" Value="{StaticResource AppTypeRenameSoftBrush}" />
+            </DataTrigger>
+            <DataTrigger Binding="{Binding Kind}" Value="Other">
+                <Setter Property="Background" Value="{StaticResource AppTypeOtherSoftBrush}" />
+            </DataTrigger>
+        </Style.Triggers>
+    </Style>
+
+    <!-- 徽章 / 统计数字的类型主色（按条目的 Kind 映射，供文本复用） -->
+    <Style x:Key="AppKindText" TargetType="TextBlock">
+        <Setter Property="Foreground" Value="{StaticResource AppTypeAddBrush}" />
+        <Style.Triggers>
+            <DataTrigger Binding="{Binding Kind}" Value="Deleted">
+                <Setter Property="Foreground" Value="{StaticResource AppTypeDeleteBrush}" />
+            </DataTrigger>
+            <DataTrigger Binding="{Binding Kind}" Value="Modified">
+                <Setter Property="Foreground" Value="{StaticResource AppTypeModifyBrush}" />
+            </DataTrigger>
+            <DataTrigger Binding="{Binding Kind}" Value="Renamed">
+                <Setter Property="Foreground" Value="{StaticResource AppTypeRenameBrush}" />
+            </DataTrigger>
+            <DataTrigger Binding="{Binding Kind}" Value="Other">
+                <Setter Property="Foreground" Value="{StaticResource AppTypeOtherBrush}" />
+            </DataTrigger>
+        </Style.Triggers>
+    </Style>
+
+    <!-- 统计卡色块（原型 .swatch：10x10、圆角 3、类型主色） -->
+    <Style x:Key="AppKindSwatch" TargetType="Rectangle">
+        <Setter Property="Width" Value="10" />
+        <Setter Property="Height" Value="10" />
+        <Setter Property="RadiusX" Value="3" />
+        <Setter Property="RadiusY" Value="3" />
+        <Setter Property="Fill" Value="{StaticResource AppTypeAddBrush}" />
+        <Style.Triggers>
+            <DataTrigger Binding="{Binding Kind}" Value="Deleted">
+                <Setter Property="Fill" Value="{StaticResource AppTypeDeleteBrush}" />
+            </DataTrigger>
+            <DataTrigger Binding="{Binding Kind}" Value="Modified">
+                <Setter Property="Fill" Value="{StaticResource AppTypeModifyBrush}" />
+            </DataTrigger>
+            <DataTrigger Binding="{Binding Kind}" Value="Renamed">
+                <Setter Property="Fill" Value="{StaticResource AppTypeRenameBrush}" />
+            </DataTrigger>
+            <DataTrigger Binding="{Binding Kind}" Value="Other">
+                <Setter Property="Fill" Value="{StaticResource AppTypeOtherBrush}" />
+            </DataTrigger>
+        </Style.Triggers>
+    </Style>
+
+    <!-- 类型徽章（原型 .pill：10.5px 粗体、圆角 9、类型浅底 + 主色字；颜色在文字样式上） -->
+    <Style x:Key="AppTypeBadge" TargetType="Border">
+        <Setter Property="Background" Value="{StaticResource AppTypeAddSoftBrush}" />
+        <Setter Property="CornerRadius" Value="9" />
+        <Setter Property="Padding" Value="7,1.5" />
+        <Setter Property="VerticalAlignment" Value="Center" />
+        <Setter Property="SnapsToDevicePixels" Value="True" />
+        <Style.Triggers>
+            <DataTrigger Binding="{Binding Kind}" Value="Deleted">
+                <Setter Property="Background" Value="{StaticResource AppTypeDeleteSoftBrush}" />
+            </DataTrigger>
+            <DataTrigger Binding="{Binding Kind}" Value="Modified">
+                <Setter Property="Background" Value="{StaticResource AppTypeModifySoftBrush}" />
+            </DataTrigger>
+            <DataTrigger Binding="{Binding Kind}" Value="Renamed">
+                <Setter Property="Background" Value="{StaticResource AppTypeRenameSoftBrush}" />
+            </DataTrigger>
+            <DataTrigger Binding="{Binding Kind}" Value="Other">
+                <Setter Property="Background" Value="{StaticResource AppTypeOtherSoftBrush}" />
+            </DataTrigger>
+        </Style.Triggers>
+    </Style>
+
+    <!-- 类型徽章文字（原型 .pill：主色 10.5px 粗体） -->
+    <Style x:Key="AppTypeBadgeText" TargetType="TextBlock" BasedOn="{StaticResource AppKindText}">
+        <Setter Property="FontSize" Value="10.5" />
+        <Setter Property="FontWeight" Value="SemiBold" />
+    </Style>
+
+    <!-- 文件行路径（原型 .f-path：mono 12px；重命名旧行的淡化在行内单独覆盖） -->
+    <Style x:Key="AppFilePathText" TargetType="TextBlock">
+        <Setter Property="FontFamily" Value="{StaticResource AppMonospaceFontFamily}" />
+        <Setter Property="FontSize" Value="12" />
+        <Setter Property="Foreground" Value="{DynamicResource TextFillColorPrimaryBrush}" />
+        <Setter Property="TextWrapping" Value="Wrap" />
+        <Setter Property="VerticalAlignment" Value="Center" />
+    </Style>
+
+    <!-- +行数（原型 .delta .plus：mono 11px，ok 色） -->
+    <Style x:Key="AppDeltaPlusText" TargetType="TextBlock">
+        <Setter Property="FontFamily" Value="{StaticResource AppMonospaceFontFamily}" />
+        <Setter Property="FontSize" Value="11" />
+        <Setter Property="Foreground" Value="{StaticResource AppSuccessBrush}" />
+        <Setter Property="VerticalAlignment" Value="Center" />
+    </Style>
+
+    <!-- -行数（原型 .delta .minus：mono 11px，err 色） -->
+    <Style x:Key="AppDeltaMinusText" TargetType="TextBlock" BasedOn="{StaticResource AppDeltaPlusText}">
+        <Setter Property="Foreground" Value="{StaticResource AppDangerBrush}" />
+    </Style>
+
+    <!-- 无行数的补充说明（相似度 / 二进制 / 「其他」原因：mono 11px 主文字色） -->
+    <Style x:Key="AppDeltaNoteText" TargetType="TextBlock">
+        <Setter Property="FontFamily" Value="{StaticResource AppMonospaceFontFamily}" />
+        <Setter Property="FontSize" Value="11" />
+        <Setter Property="Foreground" Value="{DynamicResource TextFillColorPrimaryBrush}" />
+        <Setter Property="VerticalAlignment" Value="Center" />
+    </Style>
+
+    <!-- 文件大小（原型 .f-size：11px 三级色、右对齐、最小宽 56） -->
+    <Style x:Key="AppFileSizeText" TargetType="TextBlock">
+        <Setter Property="FontSize" Value="11" />
+        <Setter Property="Foreground" Value="{DynamicResource TextFillColorTertiaryBrush}" />
+        <Setter Property="MinWidth" Value="56" />
+        <Setter Property="TextAlignment" Value="Right" />
+        <Setter Property="VerticalAlignment" Value="Center" />
+    </Style>
+
     <!-- ==================== 左侧导航项（原型 .nav-item） ==================== -->
     <!--
         WpfUI 自带的项模板（NavigationViewCompact.xaml 的 LeftCompactNavigationViewItemTemplate）

@@ -1,6 +1,8 @@
+using System.Globalization;
 using System.IO;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
+using GitHarvest.Core.Export;
 using GitHarvest.Core.Git;
 using GitHarvest.Core.Interaction;
 using GitHarvest.Core.Navigation;
@@ -13,12 +15,14 @@ namespace GitHarvest.ViewModels;
 /// 选择提交页（工作流第 2 步）的状态：分支选择（本地/远程分组、过滤、游离标注）、
 /// 「拉取」刷新、上次选中分支的记忆与自动选中，以及基准/Head 双栏提交列表
 /// （搜索过滤、滚动增量加载、单提交详情预览与变更范围指示）。
-/// 只依赖 Core 接口——分支、提交与拉取走 <see cref="IGitService"/>，上次分支走
-/// <see cref="ISettingsService"/>，当前仓库来自 <see cref="IRepositorySession"/>。
+/// 只依赖 Core 接口——分支、提交与拉取走 <see cref="IGitService"/>，选齐后的即时祖先校验
+/// 与文件数走 <see cref="IExportService"/>，上次分支走 <see cref="ISettingsService"/>，
+/// 当前仓库来自 <see cref="IRepositorySession"/>。
 /// </summary>
 public sealed partial class PickCommitsViewModel : ObservableObject
 {
     private readonly IGitService _gitService;
+    private readonly IExportService _exportService;
     private readonly ISettingsService _settings;
     private readonly IRepositorySession _session;
     private readonly IShellNavigator _navigator;
@@ -29,9 +33,14 @@ public sealed partial class PickCommitsViewModel : ObservableObject
     /// <summary>全量分支候选项（过滤前的源），过滤投影到 <see cref="BranchGroups"/>。</summary>
     private IReadOnlyList<BranchItem> _allBranches = [];
 
+    /// <summary>祖先校验的竞态令牌：两栏任一选中变化即自增，慢的旧校验结果晚归直接丢弃
+    /// （与提交列表查询的 <c>_generation</c> 同一套路）。</summary>
+    private int _validationGeneration;
+
     public PickCommitsViewModel(
         ShellViewModel shell,
         IGitService gitService,
+        IExportService exportService,
         ISettingsService settings,
         IRepositorySession session,
         IShellNavigator navigator,
@@ -39,6 +48,7 @@ public sealed partial class PickCommitsViewModel : ObservableObject
     {
         ArgumentNullException.ThrowIfNull(shell);
         ArgumentNullException.ThrowIfNull(gitService);
+        ArgumentNullException.ThrowIfNull(exportService);
         ArgumentNullException.ThrowIfNull(settings);
         ArgumentNullException.ThrowIfNull(session);
         ArgumentNullException.ThrowIfNull(navigator);
@@ -46,6 +56,7 @@ public sealed partial class PickCommitsViewModel : ObservableObject
 
         Shell = shell;
         _gitService = gitService;
+        _exportService = exportService;
         _settings = settings;
         _session = session;
         _navigator = navigator;
@@ -91,13 +102,29 @@ public sealed partial class PickCommitsViewModel : ObservableObject
     /// <summary>范围条上 Head 一侧的短哈希；未指定时为「—」。</summary>
     public string RangeHeadHash => HeadList.SelectedCommit?.ShortHash ?? "—";
 
-    /// <summary>范围条的状态文案：选齐后说明变更范围的语义（双点 base..head）；
-    /// 祖先校验（merge-base）与文件清单属于第 3 步「导出前总预览」，本页不重复做。
+    /// <summary>
+    /// 范围条的状态文案：未选齐给引导、选齐后随祖先校验的结论更新
+    /// （校验中 / 通过带提交数 / 分叉 / 流程失败），对应原型 range-bar 的 .count。
     /// </summary>
-    public string RangeText =>
-        HasRange
-            ? $"变更范围 {RangeBaseHash}..{RangeHeadHash}（不含基准、含 Head）。"
-            : "请分别在两栏指定基准提交与 Head 提交。";
+    [ObservableProperty]
+    private string _rangeStatText = "请分别在两栏指定基准提交与 Head 提交。";
+
+    /// <summary>祖先校验横幅的状态：未选齐（不显示）/ 通过（绿）/ 流程失败（中性黄）/ 分叉（红）。</summary>
+    [ObservableProperty]
+    private AncestryBannerKind _ancestryState = AncestryBannerKind.None;
+
+    /// <summary>中性黄横幅的失败原因（校验流程本身失败时给出，如分支被删、git 不可用）。</summary>
+    [ObservableProperty]
+    private string? _ancestryNote;
+
+    /// <summary>通过横幅与范围条统计里的加粗提交数（「共经过 N 次提交」；基准与 Head 同一提交时为 0）。</summary>
+    [ObservableProperty]
+    private string _rangeCommitCountText = "0";
+
+    /// <summary>范围条统计里的加粗文件数（「变更范围：N 个文件」，来自导出编排的汇总——
+    /// 与第 3 步预览页的「共 N 个文件」同源）。</summary>
+    [ObservableProperty]
+    private string _rangeFilesText = "0";
 
     /// <summary>当前打开的仓库（来自会话）；未打开时页面显示「先打开仓库」的引导。</summary>
     public RepositoryInfo? Repository => _session.OpenedRepository;
@@ -150,12 +177,16 @@ public sealed partial class PickCommitsViewModel : ObservableObject
     /// <summary>
     /// 页面加载时读取分支列表：成功后自动选中——上次用过的分支优先，
     /// 其次当前检出的分支（用户故事：减少重复操作）。
+    /// 加载结束后跑一次范围门控：空分支 / 读取失败时不会有任何选中事件，
+    /// 显式评估一次保证「未选齐 → 下一步置灰」在页面打开时即生效。
     /// </summary>
     [RelayCommand]
     private async Task LoadBranchesAsync()
     {
         if (Repository is not { } repository)
         {
+            // 未打开仓库：没有可选内容，状态与门控统一交给范围校验收敛（未选齐 → 下一步置灰）。
+            await ValidateRangeAsync();
             return;
         }
 
@@ -175,6 +206,8 @@ public sealed partial class PickCommitsViewModel : ObservableObject
         {
             IsBusy = false;
         }
+
+        await ValidateRangeAsync();
     }
 
     /// <summary>
@@ -342,7 +375,10 @@ public sealed partial class PickCommitsViewModel : ObservableObject
         }
     }
 
-    /// <summary>栏的选中项变化时同步范围条（哈希 chip 与状态文案都来自两栏的选中状态）。</summary>
+    /// <summary>栏的选中项变化时同步范围条、仓库会话与即时祖先校验（原型 validate() 的触发点：
+    /// 任一栏选中变化立即校验一次，横幅 / 统计 / 「下一步」门控同源）。
+    /// 会话里的 <see cref="IRepositorySession.SelectedRange"/> 是第 3 步「导出前总预览」的数据入口——
+    /// 基准与 Head 选齐即整体写入，任一侧被取消（含切分支时的重置）即整体清空。</summary>
     private void OnColumnPropertyChanged(object? sender, System.ComponentModel.PropertyChangedEventArgs e)
     {
         if (e.PropertyName == nameof(CommitColumnViewModel.SelectedCommit))
@@ -350,15 +386,126 @@ public sealed partial class PickCommitsViewModel : ObservableObject
             OnPropertyChanged(nameof(HasRange));
             OnPropertyChanged(nameof(RangeBaseHash));
             OnPropertyChanged(nameof(RangeHeadHash));
-            OnPropertyChanged(nameof(RangeText));
+            UpdateSessionRange();
+            _ = ValidateRangeAsync();
         }
     }
+
+    /// <summary>
+    /// 即时祖先校验（补遗：原型把校验画在第 2 步，ticket 08 的校验在第 3 步）：
+    /// 未选齐先清态，且按所有者决策「下一步」置灰——基准或 Head 任一未选都无法进入第 3 步；
+    /// 选齐后经 <see cref="IExportService.BuildPreviewAsync"/>
+    /// 一次拿到祖先结论与文件数，再补提交数——横幅、范围条统计与「下一步」门控三处输出同源。
+    /// 快速改选用代际令牌丢弃过期结果。流程失败（分支被删等）显示中性提示，
+    /// 不显示「通过」；此时范围已选齐，不额外拦截（拦的只是确定结论：未选齐与分叉）。
+    /// </summary>
+    private async Task ValidateRangeAsync()
+    {
+        var generation = ++_validationGeneration;
+
+        // 未选齐（或仓库已不在）：横幅不出现，统计回到引导文案；「下一步」置灰
+        // （所有者决策：基准或 Head 任一未选都进不了第 3 步；侧边栏自由导航不受影响）。
+        if (!HasRange || Repository is null)
+        {
+            AncestryState = AncestryBannerKind.None;
+            AncestryNote = null;
+            RangeStatText = "请分别在两栏指定基准提交与 Head 提交。";
+            Shell.PageBlocksNext = true;
+            return;
+        }
+
+        RangeStatText = "正在校验祖先关系…";
+        var baseHash = BaseList.SelectedCommit!.ShortHash;
+        var headHash = HeadList.SelectedCommit!.ShortHash;
+
+        // 导出编排的第一步：祖先校验 → 双点差异 → 汇总，与第 3 步预览同源（文件数由此而来）。
+        var preview = await _exportService.BuildPreviewAsync(Repository.RootPath, baseHash, headHash)
+            .ConfigureAwait(true);
+        if (generation != _validationGeneration)
+        {
+            return;
+        }
+
+        if (preview.IsAncestryViolated)
+        {
+            AncestryState = AncestryBannerKind.Error;
+            AncestryNote = null;
+            RangeStatText = "基准与 Head 不在同一祖先链上，无法导出。";
+            Shell.PageBlocksNext = true;
+            return;
+        }
+
+        if (!preview.IsSuccess)
+        {
+            AncestryState = AncestryBannerKind.Warn;
+            AncestryNote = preview.FailureMessage;
+            RangeStatText = "祖先校验未完成。";
+            Shell.PageBlocksNext = false;
+            return;
+        }
+
+        var count = await _gitService.GetRangeCommitCountAsync(Repository.RootPath, baseHash, headHash)
+            .ConfigureAwait(true);
+        if (generation != _validationGeneration)
+        {
+            return;
+        }
+
+        if (!count.IsSuccess)
+        {
+            // 祖先与文件数都拿到了却拿不到提交数：按中性提示处理，不显示「通过」误导用户。
+            AncestryState = AncestryBannerKind.Warn;
+            AncestryNote = count.FailureMessage;
+            RangeStatText = "祖先校验未完成。";
+            Shell.PageBlocksNext = false;
+            return;
+        }
+
+        AncestryState = AncestryBannerKind.Ok;
+        AncestryNote = null;
+        RangeFilesText = preview.Summary!.TotalCount.ToString(CultureInfo.InvariantCulture);
+        RangeCommitCountText = count.Count!.Value.ToString(CultureInfo.InvariantCulture);
+        // 整句在 Ok 态并不显示：页脚用分段元素渲染统计（数字单独加粗），此处仍按同一文案赋值，
+        // 使「整句」与「分段」两处口径无论哪处被渲染都是同一句话，不会日后各改一半。
+        RangeStatText = $"变更范围：{preview.Summary.TotalCount} 个文件 · {count.Count} 次提交";
+        Shell.PageBlocksNext = false;
+    }
+
+    /// <summary>把两栏的选中提交写入会话（选齐才写，未选齐清空）；摘要在 Core 与界面间复用同一形态。</summary>
+    private void UpdateSessionRange()
+        => _session.SelectedRange = HasRange
+            ? new RangeSelection(
+                ToSummary(BaseList.SelectedCommit!),
+                ToSummary(HeadList.SelectedCommit!))
+            : null;
+
+    private static CommitSummary ToSummary(CommitItem item)
+        => new(item.ShortHash, item.Subject, item.AuthorName, item.AuthorTime);
 }
 
 /// <summary>
 /// 分支下拉中的一组（本地分支 / 远程分支）的显示模型：组标题 + 组内候选项。
 /// </summary>
 public sealed record BranchGroup(string Title, IReadOnlyList<BranchItem> Items);
+
+/// <summary>
+/// 第 2 步即时祖先校验横幅的状态（对应原型 page-pick 的 validBanner）：
+/// 未选齐不显示；流程失败（校验本身没跑成）用中性黄提示而不是「通过 / 失败」结论。
+/// </summary>
+public enum AncestryBannerKind
+{
+    /// <summary>未选齐基准与 Head：不显示横幅。</summary>
+    None,
+
+    /// <summary>校验通过（绿）：基准是 Head 的祖先，横幅带提交数。</summary>
+    Ok,
+
+    /// <summary>校验流程失败（中性黄）：分支被删、git 不可用等，给失败原因，不给「通过 / 失败」结论。</summary>
+    Warn,
+
+    /// <summary>校验结论为分叉提交对（红）：基准不是 Head 的祖先，禁止导出并提示调整。</summary>
+    Error,
+}
 
 /// <summary>
 /// 分支候选项的显示模型：名称与选中态。游离头指针项显示为「（游离）」。

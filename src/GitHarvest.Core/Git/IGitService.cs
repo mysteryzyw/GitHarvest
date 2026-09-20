@@ -79,4 +79,55 @@ public interface IGitService
         string repositoryPath,
         string hash,
         CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// 祖先校验（spec 用户故事 18）：基准提交必须是 Head 提交的祖先，两者不在同一祖先链上时
+    /// 禁止导出。入参接受完整 / 短哈希或其他 git 可解析的提交表达；
+    /// 基准与 Head 为同一提交时视为祖先（差异为空，由空范围逻辑处理）。
+    /// </summary>
+    /// <param name="repositoryPath">仓库目录（仓库根或其子目录）。</param>
+    /// <param name="baseHash">基准提交（完整 / 短哈希）。</param>
+    /// <param name="headHash">Head 提交（完整 / 短哈希）。</param>
+    /// <param name="cancellationToken">取消令牌；取消时终止正在执行的 git 进程。</param>
+    /// <returns>校验结果；「不是祖先」是成功得到的结论（<see cref="AncestorCheckResult.IsAncestor"/> 为假），流程失败才走 <see cref="AncestorCheckResult.Failure"/>。</returns>
+    /// <exception cref="OperationCanceledException">令牌已取消，或执行过程中被取消。</exception>
+    Task<AncestorCheckResult> CheckAncestorAsync(
+        string repositoryPath,
+        string baseHash,
+        string headHash,
+        CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// 计算双点变更范围 <c>base..head</c>（CONTEXT.md「变更范围」：含 Head 提交本身、不含基准提交）：
+    /// 对两次提交的树做差异并归类（<see cref="ChangeKind"/>，重命名按 git -M 默认 50% 阈值），
+    /// 附每文件的 +行数（二进制为空）与展示大小。与重命名检测同一份差异还产出
+    /// 新旧 blob 哈希，供导出编排（ticket 09）直接取快照。
+    /// </summary>
+    /// <param name="repositoryPath">仓库目录（仓库根或其子目录）。</param>
+    /// <param name="baseHash">基准提交（完整 / 短哈希）。</param>
+    /// <param name="headHash">Head 提交（完整 / 短哈希）。</param>
+    /// <param name="cancellationToken">取消令牌；取消时终止正在执行的 git 进程。</param>
+    /// <returns>计算结果；空差异（含基准与 Head 为同一提交）是成功结论（空清单），失败不抛异常。</returns>
+    /// <exception cref="OperationCanceledException">令牌已取消，或执行过程中被取消。</exception>
+    Task<ChangeRangeResult> GetChangeRangeAsync(
+        string repositoryPath,
+        string baseHash,
+        string headHash,
+        CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// 统计双点范围 <c>base..head</c> 内的提交数（含 Head、不含基准，与变更范围同一语义），
+    /// 供第 2 步「选择提交」的范围条即时展示。入参接受完整 / 短哈希或其他 git 可解析的提交表达。
+    /// </summary>
+    /// <param name="repositoryPath">仓库目录（仓库根或其子目录）。</param>
+    /// <param name="baseHash">基准提交（完整 / 短哈希）。</param>
+    /// <param name="headHash">Head 提交（完整 / 短哈希）。</param>
+    /// <param name="cancellationToken">取消令牌；取消时终止正在执行的 git 进程。</param>
+    /// <returns>统计结果；基准与 Head 为同一提交时成功且数量为 0，失败不抛异常。</returns>
+    /// <exception cref="OperationCanceledException">令牌已取消，或执行过程中被取消。</exception>
+    Task<CommitCountResult> GetRangeCommitCountAsync(
+        string repositoryPath,
+        string baseHash,
+        string headHash,
+        CancellationToken cancellationToken = default);
 }

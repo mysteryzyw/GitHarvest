@@ -2,9 +2,15 @@
     x:Class="GitHarvest.Views.PreviewPage"
     xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-    xmlns:controls="clr-namespace:GitHarvest.Controls">
+    xmlns:controls="clr-namespace:GitHarvest.Controls"
+    xmlns:ui="http://schemas.lepo.co/wpfui/2022/xaml">
 
-    <!-- 导出前总预览页（工作流第 3 步）。本 ticket 只放骨架占位，业务在 ticket 08 落地。 -->
+    <!--
+        导出前总预览页（工作流第 3 步，ticket 08）。
+        布局对齐原型页 2：标题行（含范围 chip 与「重新计算」）、统计卡行、
+        过滤条（路径筛选 + 类型 chip + 展开/收起）、按类型分组的文件清单、
+        底部输出路径条。祖先校验不通过 / 计算失败 / 空范围分别用横幅解释。
+    -->
 
     <Grid>
         <Grid.RowDefinitions>
@@ -18,24 +24,720 @@
             VerticalScrollBarVisibility="Auto">
             <StackPanel Style="{StaticResource PageLayout}">
 
-                <TextBlock Style="{StaticResource PageTitleText}" Text="{Binding CurrentTitle}" />
-                <TextBlock Style="{StaticResource PageSubtitleText}" Text="按变更类型分组，确认变更范围内的文件清单与统计。" />
+                <!-- 顶部行：标题 + 范围副标题在左，「重新计算」在右（原型 .row） -->
+                <Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="Auto" />
+                    </Grid.ColumnDefinitions>
 
-                <controls:StepBar Margin="0,20,0,22" />
+                    <StackPanel Grid.Column="0" VerticalAlignment="Center">
+                        <TextBlock Style="{StaticResource PageTitleText}" Text="{Binding Shell.CurrentTitle}" />
 
-                <Border Style="{StaticResource AppCard}">
+                        <!-- 未选定范围：引导文案 -->
+                        <TextBlock Text="{Binding RangeCountText}">
+                            <TextBlock.Style>
+                                <Style BasedOn="{StaticResource PageSubtitleText}" TargetType="TextBlock">
+                                    <Style.Triggers>
+                                        <DataTrigger Binding="{Binding HasRange}" Value="True">
+                                            <Setter Property="Visibility" Value="Collapsed" />
+                                        </DataTrigger>
+                                    </Style.Triggers>
+                                </Style>
+                            </TextBlock.Style>
+                        </TextBlock>
+
+                        <!-- 已选定范围：变更范围 chip（原型 .chip.mono）+ 文件数说明 -->
+                        <StackPanel Margin="0,6,0,0" Orientation="Horizontal">
+                            <StackPanel.Style>
+                                <Style TargetType="StackPanel">
+                                    <Setter Property="Visibility" Value="Collapsed" />
+                                    <Style.Triggers>
+                                        <DataTrigger Binding="{Binding HasRange}" Value="True">
+                                            <Setter Property="Visibility" Value="Visible" />
+                                        </DataTrigger>
+                                    </Style.Triggers>
+                                </Style>
+                            </StackPanel.Style>
+                            <TextBlock
+                                VerticalAlignment="Center"
+                                Style="{StaticResource PageSubtitleText}"
+                                Text="变更范围 " />
+                            <Border Style="{StaticResource AppMonoChip}">
+                                <TextBlock Style="{StaticResource AppMonoChipText}" Text="{Binding RangeBaseHash}" />
+                            </Border>
+                            <TextBlock
+                                Margin="8,0"
+                                VerticalAlignment="Center"
+                                FontSize="12.5"
+                                Foreground="{DynamicResource TextFillColorSecondaryBrush}"
+                                Text=".." />
+                            <Border Style="{StaticResource AppMonoChip}">
+                                <TextBlock Style="{StaticResource AppMonoChipText}" Text="{Binding RangeHeadHash}" />
+                            </Border>
+                            <TextBlock
+                                Margin="10,0,0,0"
+                                VerticalAlignment="Center"
+                                Style="{StaticResource PageSubtitleText}"
+                                Text="{Binding RangeCountText}" />
+                        </StackPanel>
+                    </StackPanel>
+
+                    <!--
+                        「重新计算」（原型 .btn：refresh 图标 + 文字）。
+                        计算进行中图标旋转、文案变「计算中…」、按钮禁用防重复提交。
+                    -->
+                    <ui:Button
+                        Grid.Column="1"
+                        VerticalAlignment="Center"
+                        Command="{Binding RecalculateCommand}"
+                        Content="{Binding RecalculateButtonText}"
+                        IsEnabled="{Binding HasRange}"
+                        Style="{StaticResource AppSecondaryButton}">
+                        <ui:Button.Icon>
+                            <ui:SymbolIcon
+                                FontSize="14"
+                                RenderTransformOrigin="0.5,0.5"
+                                Symbol="ArrowSync24">
+                                <ui:SymbolIcon.Style>
+                                    <Style TargetType="ui:SymbolIcon">
+                                        <Setter Property="RenderTransform">
+                                            <Setter.Value>
+                                                <RotateTransform Angle="0" />
+                                            </Setter.Value>
+                                        </Setter>
+                                        <Style.Triggers>
+                                            <DataTrigger Binding="{Binding IsCalculating}" Value="True">
+                                                <DataTrigger.EnterActions>
+                                                    <BeginStoryboard>
+                                                        <Storyboard>
+                                                            <DoubleAnimation
+                                                                Storyboard.TargetProperty="(UIElement.RenderTransform).(RotateTransform.Angle)"
+                                                                From="0"
+                                                                To="360"
+                                                                Duration="0:0:0.8"
+                                                                RepeatBehavior="Forever" />
+                                                        </Storyboard>
+                                                    </BeginStoryboard>
+                                                </DataTrigger.EnterActions>
+                                                <DataTrigger.ExitActions>
+                                                    <BeginStoryboard>
+                                                        <Storyboard>
+                                                            <!-- 结束即复位到 0：不转半圈定格，观感回到静止初始态。 -->
+                                                            <DoubleAnimation
+                                                                Storyboard.TargetProperty="(UIElement.RenderTransform).(RotateTransform.Angle)"
+                                                                To="0"
+                                                                Duration="0:0:0" />
+                                                        </Storyboard>
+                                                    </BeginStoryboard>
+                                                </DataTrigger.ExitActions>
+                                            </DataTrigger>
+                                        </Style.Triggers>
+                                    </Style>
+                                </ui:SymbolIcon.Style>
+                            </ui:SymbolIcon>
+                        </ui:Button.Icon>
+                    </ui:Button>
+                </Grid>
+
+                <!-- 步骤条与底栏的数据上下文是外壳状态（Steps / 上一步下一步命令都在 Shell 上） -->
+                <controls:StepBar Margin="0,20,0,22" DataContext="{Binding Shell}" />
+
+                <!-- 未选定变更范围：引导回第 2 步（导航可直接跳到本页） -->
+                <Border>
+                    <Border.Style>
+                        <Style BasedOn="{StaticResource AppCard}" TargetType="Border">
+                            <Setter Property="Padding" Value="22,18" />
+                            <Style.Triggers>
+                                <DataTrigger Binding="{Binding HasRange}" Value="True">
+                                    <Setter Property="Visibility" Value="Collapsed" />
+                                </DataTrigger>
+                            </Style.Triggers>
+                        </Style>
+                    </Border.Style>
                     <StackPanel>
-                        <TextBlock Style="{StaticResource SectionHeaderText}" Text="骨架占位" />
+                        <TextBlock Style="{StaticResource SectionHeaderText}" Text="尚未选定变更范围" />
                         <TextBlock
                             Margin="0,6,0,0"
                             Style="{StaticResource HintText}"
-                            Text="本页尚无业务功能。计划落地内容：新增 / 删除 / 修改 / 重命名 / 其他 五类分组清单与统计卡片、类型徽章、行内调整输出路径、重新计算（ticket 08）。" />
+                            Text="请先在第 2 步「选择提交」中分别指定基准提交与 Head 提交。" />
+                        <ui:Button
+                            Margin="0,14,0,0"
+                            HorizontalAlignment="Left"
+                            Command="{Binding GoToPickCommitsCommand}"
+                            Content="返回：选择提交"
+                            Style="{StaticResource AppSecondaryButton}" />
                     </StackPanel>
                 </Border>
+
+                <!-- 错误横幅（祖先校验不通过 / 计算失败） -->
+                <Border>
+                    <Border.Style>
+                        <Style BasedOn="{StaticResource AppErrorBanner}" TargetType="Border">
+                            <Setter Property="Margin" Value="0,0,0,16" />
+                            <Style.Triggers>
+                                <DataTrigger Binding="{Binding HasError}" Value="False">
+                                    <Setter Property="Visibility" Value="Collapsed" />
+                                </DataTrigger>
+                            </Style.Triggers>
+                        </Style>
+                    </Border.Style>
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto" />
+                            <ColumnDefinition Width="*" />
+                        </Grid.ColumnDefinitions>
+                        <ui:SymbolIcon
+                            Grid.Column="0"
+                            FontSize="16"
+                            Foreground="{StaticResource AppDangerBrush}"
+                            Symbol="ErrorCircle24" />
+                        <TextBlock
+                            Grid.Column="1"
+                            Margin="10,0,0,0"
+                            Style="{StaticResource AppBannerText}"
+                            Text="{Binding ErrorMessage}" />
+                    </Grid>
+                </Border>
+
+                <!-- 空变更范围警告（提示并禁止导出，spec 用户故事 30） -->
+                <Border>
+                    <Border.Style>
+                        <Style BasedOn="{StaticResource AppWarningBanner}" TargetType="Border">
+                            <Setter Property="Margin" Value="0,0,0,16" />
+                            <!-- 默认隐藏：仅「已得到汇总且范围为空」时显示，其余形态（失败 / 引导）都不出现 -->
+                            <Setter Property="Visibility" Value="Collapsed" />
+                            <Style.Triggers>
+                                <MultiDataTrigger>
+                                    <MultiDataTrigger.Conditions>
+                                        <Condition Binding="{Binding HasSummary}" Value="True" />
+                                        <Condition Binding="{Binding IsEmptyRange}" Value="True" />
+                                    </MultiDataTrigger.Conditions>
+                                    <Setter Property="Visibility" Value="Visible" />
+                                </MultiDataTrigger>
+                            </Style.Triggers>
+                        </Style>
+                    </Border.Style>
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto" />
+                            <ColumnDefinition Width="*" />
+                        </Grid.ColumnDefinitions>
+                        <ui:SymbolIcon
+                            Grid.Column="0"
+                            FontSize="16"
+                            Foreground="{StaticResource AppWarnBrush}"
+                            Symbol="Warning24" />
+                        <TextBlock
+                            Grid.Column="1"
+                            Margin="10,0,0,0"
+                            Style="{StaticResource AppWarningText}"
+                            Text="变更范围内没有任何文件变更，禁止导出。如需导出请回到第 2 步重新选择基准与 Head。" />
+                    </Grid>
+                </Border>
+
+                <!-- 统计卡行（原型 .stat-row：五等分列 + 14px 间隙列；点击卡片切类型过滤） -->
+                <Grid Margin="0,0,0,18">
+                    <Grid.Style>
+                        <Style TargetType="Grid">
+                            <Setter Property="Visibility" Value="Collapsed" />
+                            <Style.Triggers>
+                                <DataTrigger Binding="{Binding HasSummary}" Value="True">
+                                    <Setter Property="Visibility" Value="Visible" />
+                                </DataTrigger>
+                            </Style.Triggers>
+                        </Style>
+                    </Grid.Style>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="14" />
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="14" />
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="14" />
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="14" />
+                        <ColumnDefinition Width="*" />
+                    </Grid.ColumnDefinitions>
+
+                    <!--
+                        统计卡：DataContext 按序号取统计模型，命令取自页面
+                        （DataContext 是卡片自身的模型）。选中态（当前类型过滤）画强调色描边。
+                    -->
+                    <ToggleButton
+                        Grid.Column="0"
+                        Command="{Binding DataContext.SelectKindCommand, RelativeSource={RelativeSource AncestorType=Page}}"
+                        CommandParameter="{Binding Kind}"
+                        DataContext="{Binding Statistics[0]}"
+                        IsChecked="{Binding IsSelected, Mode=OneWay}"
+                        Style="{StaticResource AppStatCard}">
+                        <StackPanel>
+                            <StackPanel Orientation="Horizontal">
+                                <Rectangle Style="{StaticResource AppKindSwatch}" />
+                                <TextBlock
+                                    Margin="8,0,0,0"
+                                    VerticalAlignment="Center"
+                                    FontSize="12.5"
+                                    Foreground="{DynamicResource TextFillColorSecondaryBrush}"
+                                    Text="{Binding Title}" />
+                            </StackPanel>
+                            <TextBlock
+                                Margin="0,6,0,0"
+                                FontSize="26"
+                                FontWeight="SemiBold"
+                                Style="{StaticResource AppKindText}"
+                                Text="{Binding Count}" />
+                            <TextBlock
+                                Margin="0,2,0,0"
+                                FontSize="11.5"
+                                Foreground="{DynamicResource TextFillColorTertiaryBrush}"
+                                Text="{Binding PercentText}" />
+                        </StackPanel>
+                    </ToggleButton>
+
+                    <ToggleButton
+                        Grid.Column="2"
+                        Command="{Binding DataContext.SelectKindCommand, RelativeSource={RelativeSource AncestorType=Page}}"
+                        CommandParameter="{Binding Kind}"
+                        DataContext="{Binding Statistics[1]}"
+                        IsChecked="{Binding IsSelected, Mode=OneWay}"
+                        Style="{StaticResource AppStatCard}">
+                        <StackPanel>
+                            <StackPanel Orientation="Horizontal">
+                                <Rectangle Style="{StaticResource AppKindSwatch}" />
+                                <TextBlock
+                                    Margin="8,0,0,0"
+                                    VerticalAlignment="Center"
+                                    FontSize="12.5"
+                                    Foreground="{DynamicResource TextFillColorSecondaryBrush}"
+                                    Text="{Binding Title}" />
+                            </StackPanel>
+                            <TextBlock
+                                Margin="0,6,0,0"
+                                FontSize="26"
+                                FontWeight="SemiBold"
+                                Style="{StaticResource AppKindText}"
+                                Text="{Binding Count}" />
+                            <TextBlock
+                                Margin="0,2,0,0"
+                                FontSize="11.5"
+                                Foreground="{DynamicResource TextFillColorTertiaryBrush}"
+                                Text="{Binding PercentText}" />
+                        </StackPanel>
+                    </ToggleButton>
+
+                    <ToggleButton
+                        Grid.Column="4"
+                        Command="{Binding DataContext.SelectKindCommand, RelativeSource={RelativeSource AncestorType=Page}}"
+                        CommandParameter="{Binding Kind}"
+                        DataContext="{Binding Statistics[2]}"
+                        IsChecked="{Binding IsSelected, Mode=OneWay}"
+                        Style="{StaticResource AppStatCard}">
+                        <StackPanel>
+                            <StackPanel Orientation="Horizontal">
+                                <Rectangle Style="{StaticResource AppKindSwatch}" />
+                                <TextBlock
+                                    Margin="8,0,0,0"
+                                    VerticalAlignment="Center"
+                                    FontSize="12.5"
+                                    Foreground="{DynamicResource TextFillColorSecondaryBrush}"
+                                    Text="{Binding Title}" />
+                            </StackPanel>
+                            <TextBlock
+                                Margin="0,6,0,0"
+                                FontSize="26"
+                                FontWeight="SemiBold"
+                                Style="{StaticResource AppKindText}"
+                                Text="{Binding Count}" />
+                            <TextBlock
+                                Margin="0,2,0,0"
+                                FontSize="11.5"
+                                Foreground="{DynamicResource TextFillColorTertiaryBrush}"
+                                Text="{Binding PercentText}" />
+                        </StackPanel>
+                    </ToggleButton>
+
+                    <ToggleButton
+                        Grid.Column="6"
+                        Command="{Binding DataContext.SelectKindCommand, RelativeSource={RelativeSource AncestorType=Page}}"
+                        CommandParameter="{Binding Kind}"
+                        DataContext="{Binding Statistics[3]}"
+                        IsChecked="{Binding IsSelected, Mode=OneWay}"
+                        Style="{StaticResource AppStatCard}">
+                        <StackPanel>
+                            <StackPanel Orientation="Horizontal">
+                                <Rectangle Style="{StaticResource AppKindSwatch}" />
+                                <TextBlock
+                                    Margin="8,0,0,0"
+                                    VerticalAlignment="Center"
+                                    FontSize="12.5"
+                                    Foreground="{DynamicResource TextFillColorSecondaryBrush}"
+                                    Text="{Binding Title}" />
+                            </StackPanel>
+                            <TextBlock
+                                Margin="0,6,0,0"
+                                FontSize="26"
+                                FontWeight="SemiBold"
+                                Style="{StaticResource AppKindText}"
+                                Text="{Binding Count}" />
+                            <TextBlock
+                                Margin="0,2,0,0"
+                                FontSize="11.5"
+                                Foreground="{DynamicResource TextFillColorTertiaryBrush}"
+                                Text="{Binding PercentText}" />
+                        </StackPanel>
+                    </ToggleButton>
+
+                    <ToggleButton
+                        Grid.Column="8"
+                        Command="{Binding DataContext.SelectKindCommand, RelativeSource={RelativeSource AncestorType=Page}}"
+                        CommandParameter="{Binding Kind}"
+                        DataContext="{Binding Statistics[4]}"
+                        IsChecked="{Binding IsSelected, Mode=OneWay}"
+                        Style="{StaticResource AppStatCard}">
+                        <StackPanel>
+                            <StackPanel Orientation="Horizontal">
+                                <Rectangle Style="{StaticResource AppKindSwatch}" />
+                                <TextBlock
+                                    Margin="8,0,0,0"
+                                    VerticalAlignment="Center"
+                                    FontSize="12.5"
+                                    Foreground="{DynamicResource TextFillColorSecondaryBrush}"
+                                    Text="{Binding Title}" />
+                            </StackPanel>
+                            <TextBlock
+                                Margin="0,6,0,0"
+                                FontSize="26"
+                                FontWeight="SemiBold"
+                                Style="{StaticResource AppKindText}"
+                                Text="{Binding Count}" />
+                            <TextBlock
+                                Margin="0,2,0,0"
+                                FontSize="11.5"
+                                Foreground="{DynamicResource TextFillColorTertiaryBrush}"
+                                Text="{Binding PercentText}" />
+                        </StackPanel>
+                    </ToggleButton>
+                </Grid>
+
+                <!-- 过滤条：路径筛选 + 类型 chip + 展开 / 收起（原型 .filter-bar） -->
+                <StackPanel Margin="0,0,0,14" Orientation="Horizontal">
+                    <StackPanel.Style>
+                        <Style TargetType="StackPanel">
+                            <Setter Property="Visibility" Value="Collapsed" />
+                            <Style.Triggers>
+                                <MultiDataTrigger>
+                                    <MultiDataTrigger.Conditions>
+                                        <Condition Binding="{Binding HasSummary}" Value="True" />
+                                        <Condition Binding="{Binding IsEmptyRange}" Value="False" />
+                                    </MultiDataTrigger.Conditions>
+                                    <Setter Property="Visibility" Value="Visible" />
+                                </MultiDataTrigger>
+                            </Style.Triggers>
+                        </Style>
+                    </StackPanel.Style>
+
+                    <!-- 路径筛选框：不设固定高度、收小内边距让模板自然伸展（见选择提交页同款注释） -->
+                    <ui:TextBox
+                        Width="260"
+                        Padding="10,5,10,5"
+                        VerticalContentAlignment="Center"
+                        FocusVisualStyle="{x:Null}"
+                        FontSize="13"
+                        PlaceholderText="筛选文件路径"
+                        Text="{Binding FilterText, UpdateSourceTrigger=PropertyChanged}">
+                        <ui:TextBox.Icon>
+                            <ui:SymbolIcon
+                                FontSize="14"
+                                Foreground="{DynamicResource TextFillColorTertiaryBrush}"
+                                Symbol="Search24" />
+                        </ui:TextBox.Icon>
+                    </ui:TextBox>
+
+                    <!-- 类型 chip（原型 .f-chip）：单选由 ViewModel 的选中态驱动 -->
+                    <ItemsControl Margin="10,0,0,0" ItemsSource="{Binding KindFilterOptions}">
+                        <ItemsControl.ItemsPanel>
+                            <ItemsPanelTemplate>
+                                <StackPanel Orientation="Horizontal" />
+                            </ItemsPanelTemplate>
+                        </ItemsControl.ItemsPanel>
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate>
+                                <ToggleButton
+                                    Margin="0,0,10,0"
+                                    Command="{Binding DataContext.SelectKindCommand, RelativeSource={RelativeSource AncestorType=Page}}"
+                                    CommandParameter="{Binding Kind}"
+                                    IsChecked="{Binding IsSelected, Mode=OneWay}"
+                                    Style="{StaticResource AppFilterChip}">
+                                    <StackPanel Orientation="Horizontal">
+                                        <TextBlock Style="{StaticResource AppFilterChipText}" Text="{Binding Title}" />
+                                        <TextBlock
+                                            Margin="6,0,0,0"
+                                            Style="{StaticResource AppFilterChipCount}"
+                                            Text="{Binding Count}" />
+                                    </StackPanel>
+                                </ToggleButton>
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+
+                    <ui:Button
+                        Margin="6,0,0,0"
+                        Command="{Binding ExpandAllCommand}"
+                        Content="全部展开"
+                        Style="{StaticResource AppSubtleButton}" />
+                    <ui:Button
+                        Command="{Binding CollapseAllCommand}"
+                        Content="全部收起"
+                        Style="{StaticResource AppSubtleButton}" />
+                </StackPanel>
+
+                <!-- 分组清单（原型 .group：组头可点展开收起，组内文件行带徽章 / 行数 / 大小） -->
+                <ItemsControl ItemsSource="{Binding Groups}">
+                    <ItemsControl.ItemTemplate>
+                        <DataTemplate>
+                            <Border Margin="0,0,0,12" Style="{StaticResource AppGroupCard}">
+                                <StackPanel>
+                                    <!-- 组头：整行点击切换展开（IsChecked 双向绑定 IsExpanded） -->
+                                    <ToggleButton IsChecked="{Binding IsExpanded, Mode=TwoWay}" Style="{StaticResource AppGroupHead}">
+                                        <Grid>
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="Auto" />
+                                                <ColumnDefinition Width="Auto" />
+                                                <ColumnDefinition Width="Auto" />
+                                                <ColumnDefinition Width="*" />
+                                            </Grid.ColumnDefinitions>
+
+                                            <ui:SymbolIcon
+                                                Grid.Column="0"
+                                                Style="{StaticResource AppGroupChevron}"
+                                                Symbol="ChevronDown24" />
+
+                                            <Border
+                                                Grid.Column="1"
+                                                Margin="11,0,0,0"
+                                                Style="{StaticResource AppGroupBadge}">
+                                                <TextBlock
+                                                    HorizontalAlignment="Center"
+                                                    VerticalAlignment="Center"
+                                                    FontSize="11.5"
+                                                    FontWeight="SemiBold"
+                                                    Style="{StaticResource AppKindText}"
+                                                    Text="{Binding Count}" />
+                                            </Border>
+
+                                            <TextBlock
+                                                Grid.Column="2"
+                                                Margin="11,0,0,0"
+                                                VerticalAlignment="Center"
+                                                FontSize="13.5"
+                                                FontWeight="SemiBold"
+                                                Foreground="{DynamicResource TextFillColorPrimaryBrush}"
+                                                Text="{Binding Title}" />
+
+                                            <TextBlock
+                                                Grid.Column="3"
+                                                HorizontalAlignment="Right"
+                                                VerticalAlignment="Center"
+                                                FontSize="11.5"
+                                                Foreground="{DynamicResource TextFillColorTertiaryBrush}"
+                                                Text="{Binding Description}" />
+                                        </Grid>
+                                    </ToggleButton>
+
+                                    <!-- 组体：展开时显示文件行（折叠即整块隐藏） -->
+                                    <Border
+                                        BorderBrush="{StaticResource AppCardBorderBrush}"
+                                        BorderThickness="0,1,0,0"
+                                        Visibility="{Binding IsExpanded, Converter={StaticResource AppBooleanToVisibilityConverter}}">
+                                        <ItemsControl ItemsSource="{Binding Items}">
+                                            <ItemsControl.ItemTemplate>
+                                                <DataTemplate>
+                                                    <!-- 文件行（原型 .f-row：悬停浅灰底；行间 1px 细分隔线） -->
+                                                    <Border
+                                                        Padding="8,8,16,8"
+                                                        BorderBrush="#09000000"
+                                                        BorderThickness="0,0,0,1">
+                                                        <Border.Style>
+                                                            <Style TargetType="Border">
+                                                                <Style.Triggers>
+                                                                    <Trigger Property="IsMouseOver" Value="True">
+                                                                        <Setter Property="Background" Value="#07000000" />
+                                                                    </Trigger>
+                                                                </Style.Triggers>
+                                                            </Style>
+                                                        </Border.Style>
+                                                        <Grid>
+                                                            <Grid.ColumnDefinitions>
+                                                                <ColumnDefinition Width="Auto" />
+                                                                <ColumnDefinition Width="*" />
+                                                                <ColumnDefinition Width="Auto" />
+                                                            </Grid.ColumnDefinitions>
+
+                                                            <ui:SymbolIcon
+                                                                Grid.Column="0"
+                                                                Margin="0,0,11,0"
+                                                                VerticalAlignment="Center"
+                                                                FontSize="14"
+                                                                Foreground="{DynamicResource TextFillColorTertiaryBrush}"
+                                                                Symbol="Document24" />
+
+                                                            <!-- 路径：普通文件一条；重命名显示「旧 → 新」（旧路径淡化） -->
+                                                            <StackPanel Grid.Column="1" VerticalAlignment="Center">
+                                                                <StackPanel.Style>
+                                                                    <Style TargetType="StackPanel">
+                                                                        <Setter Property="Orientation" Value="Horizontal" />
+                                                                        <Style.Triggers>
+                                                                            <DataTrigger Binding="{Binding IsRenamed}" Value="False">
+                                                                                <Setter Property="Visibility" Value="Collapsed" />
+                                                                            </DataTrigger>
+                                                                        </Style.Triggers>
+                                                                    </Style>
+                                                                </StackPanel.Style>
+                                                                <TextBlock Text="{Binding OldPath}">
+                                                                    <TextBlock.Style>
+                                                                        <Style BasedOn="{StaticResource AppFilePathText}" TargetType="TextBlock">
+                                                                            <Setter Property="Foreground" Value="{DynamicResource TextFillColorTertiaryBrush}" />
+                                                                        </Style>
+                                                                    </TextBlock.Style>
+                                                                </TextBlock>
+                                                                <TextBlock
+                                                                    Margin="8,0"
+                                                                    VerticalAlignment="Center"
+                                                                    FontFamily="{StaticResource AppMonospaceFontFamily}"
+                                                                    FontSize="12"
+                                                                    Foreground="{DynamicResource TextFillColorTertiaryBrush}"
+                                                                    Text="→" />
+                                                                <TextBlock Style="{StaticResource AppFilePathText}" Text="{Binding Path}" />
+                                                            </StackPanel>
+                                                            <TextBlock
+                                                                Grid.Column="1"
+                                                                VerticalAlignment="Center"
+                                                                Text="{Binding Path}">
+                                                                <TextBlock.Style>
+                                                                    <Style BasedOn="{StaticResource AppFilePathText}" TargetType="TextBlock">
+                                                                        <Style.Triggers>
+                                                                            <DataTrigger Binding="{Binding IsRenamed}" Value="True">
+                                                                                <Setter Property="Visibility" Value="Collapsed" />
+                                                                            </DataTrigger>
+                                                                        </Style.Triggers>
+                                                                    </Style>
+                                                                </TextBlock.Style>
+                                                            </TextBlock>
+
+                                                            <!-- 右侧：+行数 / 说明、大小、类型徽章 -->
+                                                            <StackPanel
+                                                                Grid.Column="2"
+                                                                Margin="12,0,0,0"
+                                                                VerticalAlignment="Center"
+                                                                Orientation="Horizontal">
+                                                                <StackPanel Orientation="Horizontal">
+                                                                    <StackPanel.Style>
+                                                                        <Style TargetType="StackPanel">
+                                                                            <Style.Triggers>
+                                                                                <DataTrigger Binding="{Binding ShowLineCounts}" Value="False">
+                                                                                    <Setter Property="Visibility" Value="Collapsed" />
+                                                                                </DataTrigger>
+                                                                            </Style.Triggers>
+                                                                        </Style>
+                                                                    </StackPanel.Style>
+                                                                    <TextBlock Text="{Binding AdditionsText}">
+                                                                        <TextBlock.Style>
+                                                                            <Style BasedOn="{StaticResource AppDeltaPlusText}" TargetType="TextBlock">
+                                                                                <Setter Property="Visibility" Value="Collapsed" />
+                                                                                <Style.Triggers>
+                                                                                    <DataTrigger Binding="{Binding ShowAdditions}" Value="True">
+                                                                                        <Setter Property="Visibility" Value="Visible" />
+                                                                                    </DataTrigger>
+                                                                                </Style.Triggers>
+                                                                            </Style>
+                                                                        </TextBlock.Style>
+                                                                    </TextBlock>
+                                                                    <TextBlock Margin="6,0,0,0" Text="{Binding DeletionsText}">
+                                                                        <TextBlock.Style>
+                                                                            <Style BasedOn="{StaticResource AppDeltaMinusText}" TargetType="TextBlock">
+                                                                                <Setter Property="Visibility" Value="Collapsed" />
+                                                                                <Style.Triggers>
+                                                                                    <DataTrigger Binding="{Binding ShowDeletions}" Value="True">
+                                                                                        <Setter Property="Visibility" Value="Visible" />
+                                                                                    </DataTrigger>
+                                                                                </Style.Triggers>
+                                                                            </Style>
+                                                                        </TextBlock.Style>
+                                                                    </TextBlock>
+                                                                </StackPanel>
+                                                                <TextBlock Text="{Binding DeltaNote}">
+                                                                    <TextBlock.Style>
+                                                                        <Style BasedOn="{StaticResource AppDeltaNoteText}" TargetType="TextBlock">
+                                                                            <Setter Property="Visibility" Value="Collapsed" />
+                                                                            <Style.Triggers>
+                                                                                <DataTrigger Binding="{Binding ShowDeltaNote}" Value="True">
+                                                                                    <Setter Property="Visibility" Value="Visible" />
+                                                                                </DataTrigger>
+                                                                            </Style.Triggers>
+                                                                        </Style>
+                                                                    </TextBlock.Style>
+                                                                </TextBlock>
+                                                                <TextBlock
+                                                                    Margin="12,0,0,0"
+                                                                    Style="{StaticResource AppFileSizeText}"
+                                                                    Text="{Binding SizeText}" />
+                                                                <Border
+                                                                    Margin="8,0,0,0"
+                                                                    Style="{StaticResource AppTypeBadge}">
+                                                                    <TextBlock Style="{StaticResource AppTypeBadgeText}" Text="{Binding KindTitle}" />
+                                                                </Border>
+                                                            </StackPanel>
+                                                        </Grid>
+                                                    </Border>
+                                                </DataTemplate>
+                                            </ItemsControl.ItemTemplate>
+                                        </ItemsControl>
+                                    </Border>
+                                </StackPanel>
+                            </Border>
+                        </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                </ItemsControl>
 
             </StackPanel>
         </ScrollViewer>
 
-        <controls:WorkflowFooter Grid.Row="1" Margin="30,0,30,26" />
+        <!--
+            页脚左端 = 输出路径条（原型 .range-bar 的输出路径段：文件夹图标 + 标签/路径 + 更改…，
+            与步进按钮同条）。LeftContent 里的绑定用 RelativeSource 指回页面——
+            页脚的 DataContext 已桥接到 Shell，页面数据要绕回去取。
+        -->
+        <controls:WorkflowFooter Grid.Row="1" Margin="30,0,30,26" DataContext="{Binding Shell}">
+            <controls:WorkflowFooter.LeftContent>
+                <StackPanel Orientation="Horizontal">
+                    <ui:SymbolIcon
+                        VerticalAlignment="Center"
+                        FontSize="16"
+                        Foreground="{StaticResource AppAccentBrush}"
+                        Symbol="Folder24" />
+
+                    <StackPanel Margin="12,0,0,0" VerticalAlignment="Center">
+                        <TextBlock
+                            FontSize="12"
+                            Foreground="{DynamicResource TextFillColorTertiaryBrush}"
+                            Text="输出路径（按仓库记住）" />
+                        <TextBlock
+                            Margin="0,2,0,0"
+                            MaxWidth="380"
+                            Style="{StaticResource MonospaceText}"
+                            Text="{Binding DataContext.OutputPathDisplay, RelativeSource={RelativeSource AncestorType=Page}}"
+                            TextTrimming="CharacterEllipsis" />
+                    </StackPanel>
+
+                    <ui:Button
+                        Margin="14,0,0,0"
+                        VerticalAlignment="Center"
+                        Command="{Binding DataContext.ChangeOutputPathCommand, RelativeSource={RelativeSource AncestorType=Page}}"
+                        Content="更改…"
+                        Style="{StaticResource AppSecondaryButton}" />
+                </StackPanel>
+            </controls:WorkflowFooter.LeftContent>
+        </controls:WorkflowFooter>
     </Grid>
 </Page>

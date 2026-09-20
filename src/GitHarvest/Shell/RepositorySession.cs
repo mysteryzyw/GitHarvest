@@ -11,4 +11,7 @@ public sealed class RepositorySession : IRepositorySession
 {
     /// <inheritdoc />
     public RepositoryInfo? OpenedRepository { get; set; }
+
+    /// <inheritdoc />
+    public RangeSelection? SelectedRange { get; set; }
 }

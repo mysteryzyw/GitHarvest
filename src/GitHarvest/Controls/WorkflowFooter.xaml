@@ -5,31 +5,44 @@
     xmlns:ui="http://schemas.lepo.co/wpfui/2022/xaml">
 
     <!--
-        工作流页脚：原型里浮在内容区底部的操作条（.range-bar）。
-        原型操作条的左端放本次操作的上文（变更范围、输出路径等），
-        等 ticket 06 / 08 / 09 有了这些信息再往左端加内容；当前只有右端的步进按钮。
-        步进语义与可用性仍由 Core 的导航目录决定，本控件只负责外观。
+        工作流页脚：原型里浮在内容区底部的操作条（.range-bar）——左端放本次操作的上文
+        （变更范围、输出路径等，由页面通过 LeftContent 注入；原型这些信息与步进按钮同条），
+        右端是「上一步 / 下一步」。步进语义与可用性仍由 Core 的导航目录决定，本控件只负责外观。
     -->
 
     <Border Style="{StaticResource AppActionBar}">
-        <StackPanel
-            HorizontalAlignment="Right"
-            VerticalAlignment="Center"
-            Orientation="Horizontal">
+        <Grid>
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*" />
+                <ColumnDefinition Width="Auto" />
+            </Grid.ColumnDefinitions>
 
-            <ui:Button
-                Command="{Binding GoPreviousCommand}"
-                Content="上一步"
-                IsEnabled="{Binding CanGoPrevious}"
-                Style="{StaticResource AppSecondaryButton}" />
+            <!-- 左端上文：页面注入（未注入时为空，只显示右侧按钮） -->
+            <ContentControl
+                Grid.Column="0"
+                HorizontalAlignment="Left"
+                VerticalAlignment="Center"
+                Content="{Binding LeftContent, RelativeSource={RelativeSource AncestorType=UserControl}}" />
 
-            <ui:Button
-                Margin="8,0,0,0"
-                Command="{Binding GoNextCommand}"
-                Content="{Binding NextButtonText}"
-                IsEnabled="{Binding CanGoNext}"
-                Style="{StaticResource AppPrimaryButton}" />
+            <StackPanel
+                Grid.Column="1"
+                VerticalAlignment="Center"
+                Orientation="Horizontal">
 
-        </StackPanel>
+                <ui:Button
+                    Command="{Binding GoPreviousCommand}"
+                    Content="上一步"
+                    IsEnabled="{Binding CanGoPrevious}"
+                    Style="{StaticResource AppSecondaryButton}" />
+
+                <ui:Button
+                    Margin="8,0,0,0"
+                    Command="{Binding GoNextCommand}"
+                    Content="{Binding NextButtonText}"
+                    IsEnabled="{Binding CanGoNext}"
+                    Style="{StaticResource AppPrimaryButton}" />
+
+            </StackPanel>
+        </Grid>
     </Border>
 </UserControl>

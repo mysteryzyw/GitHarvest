@@ -45,6 +45,24 @@
     <SolidColorBrush x:Key="AppWarnBorderBrush" Color="#40CA5010" />
     <SolidColorBrush x:Key="AppWarnTextBrush" Color="#FF7F3D0E" />
 
+    <!-- ==================== 变更类型五色（原型 :root 的 c-add / c-del / c-mod / c-ren / c-oth） ==================== -->
+    <!--
+        导出前总预览页的五类变更：类型徽章（.pill）、分组计数徽章（.g-badge）、
+        统计卡（.stat-card 的色块与数字）共用「主色 + 浅底色」一对。
+        新增 / 删除两对与状态色（ok / err）取值相同，但语义独立各留一份，
+        避免将来状态色调整时把类型徽章一起带偏。
+    -->
+    <SolidColorBrush x:Key="AppTypeAddBrush" Color="#FF107C10" />
+    <SolidColorBrush x:Key="AppTypeAddSoftBrush" Color="#FFDFF6DD" />
+    <SolidColorBrush x:Key="AppTypeDeleteBrush" Color="#FFC42B1C" />
+    <SolidColorBrush x:Key="AppTypeDeleteSoftBrush" Color="#FFFDE7E9" />
+    <SolidColorBrush x:Key="AppTypeModifyBrush" Color="#FF0067C0" />
+    <SolidColorBrush x:Key="AppTypeModifySoftBrush" Color="#FFE8F1FB" />
+    <SolidColorBrush x:Key="AppTypeRenameBrush" Color="#FF7A3FBF" />
+    <SolidColorBrush x:Key="AppTypeRenameSoftBrush" Color="#FFF1E9FB" />
+    <SolidColorBrush x:Key="AppTypeOtherBrush" Color="#FF5D5D5D" />
+    <SolidColorBrush x:Key="AppTypeOtherSoftBrush" Color="#FFF0F0F0" />
+
     <!-- ==================== 中性色 ==================== -->
     <SolidColorBrush x:Key="AppStrokeBrush" Color="#0F000000" />
     <SolidColorBrush x:Key="AppStrokeStrongBrush" Color="#72000000" />

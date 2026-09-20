@@ -34,7 +34,21 @@ public sealed partial class ShellViewModel : ObservableObject
 
     public bool CanGoPrevious => _catalog.GetPrevious(CurrentPage) is not null;
 
-    public bool CanGoNext => _catalog.GetNext(CurrentPage) is not null;
+    /// <summary>
+    /// 「下一步」的可达性：导航目录里有下一站，且当前页面没有用业务校验结论挡住它。
+    /// 以第 2 步「选择提交」为例，两种情况会挡：基准或 Head 未选齐，以及校验跑成的结论是
+    /// 「不是祖先」（分叉提交对）。校验流程本身失败（分支被删、git 不可用）只给中性提示、不挡。
+    /// </summary>
+    public bool CanGoNext => !PageBlocksNext && _catalog.GetNext(CurrentPage) is not null;
+
+    /// <summary>
+    /// 当前页面是否用业务校验结论挡住了「下一步」。页面 VM 置位 / 复位；
+    /// 换页时由壳复位——旧页面的校验结论不带到新页，新页面按自身状态重新决定。
+    /// </summary>
+    [ObservableProperty]
+    private bool _pageBlocksNext;
+
+    partial void OnPageBlocksNextChanged(bool value) => OnPropertyChanged(nameof(CanGoNext));
 
     /// <summary>
     /// 「下一步」按钮的文案。原型把下一步的目的地写进按钮里（「下一步：导出前总预览 →」），
@@ -64,7 +78,13 @@ public sealed partial class ShellViewModel : ObservableObject
         }
     }
 
-    partial void OnCurrentPageChanged(ShellPage value) => Refresh();
+    partial void OnCurrentPageChanged(ShellPage value)
+    {
+        // 换页即复位业务门控：旧页面的「校验未通过」结论对新页面没有意义，
+        // 新页面（Transient VM）加载后会按自身状态重新置位。
+        PageBlocksNext = false;
+        Refresh();
+    }
 
     private void OnShellNavigated(object? sender, ShellPage page) => CurrentPage = page;
 

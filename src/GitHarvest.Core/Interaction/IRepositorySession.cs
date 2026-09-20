@@ -14,4 +14,10 @@ public interface IRepositorySession
 {
     /// <summary>当前打开的仓库；尚未打开时为 <see langword="null"/>。</summary>
     RepositoryInfo? OpenedRepository { get; set; }
+
+    /// <summary>
+    /// 当前选定的变更范围（第 2 步写入，第 3 步「导出前总预览」与第 4 步读取）；
+    /// 尚未选齐基准与 Head 时为 <see langword="null"/>。
+    /// </summary>
+    RangeSelection? SelectedRange { get; set; }
 }

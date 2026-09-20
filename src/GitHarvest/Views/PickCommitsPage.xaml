@@ -317,6 +317,145 @@
                 </Border>
 
                 <!--
+                    祖先校验横幅（原型 page-pick 的 validBanner，位于 stepbar 之后、双栏之上）：
+                    两栏选齐后即时校验，绿=通过（带提交数）/ 红=分叉 / 黄=校验流程失败；
+                    未选齐不显示。三个形态互斥，可见性由 AncestryState 驱动。
+                -->
+                <Border>
+                    <Border.Style>
+                        <Style BasedOn="{StaticResource AppSuccessBanner}" TargetType="Border">
+                            <Setter Property="Margin" Value="0,0,0,16" />
+                            <Setter Property="Visibility" Value="Collapsed" />
+                            <Style.Triggers>
+                                <DataTrigger Binding="{Binding AncestryState}" Value="Ok">
+                                    <Setter Property="Visibility" Value="Visible" />
+                                </DataTrigger>
+                            </Style.Triggers>
+                        </Style>
+                    </Border.Style>
+                    <StackPanel Orientation="Horizontal">
+                        <ui:SymbolIcon
+                            VerticalAlignment="Center"
+                            FontSize="16"
+                            Foreground="{StaticResource AppSuccessBrush}"
+                            Symbol="CheckmarkCircle24" />
+                        <!-- 加粗部分对齐原型 validBanner 的 <b>祖先校验通过</b> -->
+                        <TextBlock
+                            Margin="10,0,0,0"
+                            VerticalAlignment="Center"
+                            Style="{StaticResource AppSuccessText}"
+                            FontWeight="Bold"
+                            Text="祖先校验通过" />
+                        <TextBlock
+                            Margin="6,0,0,0"
+                            VerticalAlignment="Center"
+                            Style="{StaticResource AppSuccessText}"
+                            Text="— Head 提交" />
+                        <Border Margin="6,0" Style="{StaticResource AppMonoChip}">
+                            <TextBlock Style="{StaticResource AppMonoChipText}" Text="{Binding RangeHeadHash}" />
+                        </Border>
+                        <TextBlock
+                            VerticalAlignment="Center"
+                            Style="{StaticResource AppSuccessText}"
+                            Text="是基准提交" />
+                        <Border Margin="6,0" Style="{StaticResource AppMonoChip}">
+                            <TextBlock Style="{StaticResource AppMonoChipText}" Text="{Binding RangeBaseHash}" />
+                        </Border>
+                        <TextBlock
+                            VerticalAlignment="Center"
+                            Style="{StaticResource AppSuccessText}"
+                            Text="的后代，共经过" />
+                        <TextBlock
+                            Margin="5,0"
+                            VerticalAlignment="Center"
+                            Style="{StaticResource AppSuccessText}"
+                            FontWeight="SemiBold"
+                            Text="{Binding RangeCommitCountText}" />
+                        <TextBlock
+                            VerticalAlignment="Center"
+                            Style="{StaticResource AppSuccessText}"
+                            Text="次提交。" />
+                    </StackPanel>
+                </Border>
+
+                <Border>
+                    <Border.Style>
+                        <Style BasedOn="{StaticResource AppErrorBanner}" TargetType="Border">
+                            <Setter Property="Margin" Value="0,0,0,16" />
+                            <Setter Property="Visibility" Value="Collapsed" />
+                            <Style.Triggers>
+                                <DataTrigger Binding="{Binding AncestryState}" Value="Error">
+                                    <Setter Property="Visibility" Value="Visible" />
+                                </DataTrigger>
+                            </Style.Triggers>
+                        </Style>
+                    </Border.Style>
+                    <StackPanel Orientation="Horizontal">
+                        <ui:SymbolIcon
+                            VerticalAlignment="Center"
+                            FontSize="16"
+                            Foreground="{StaticResource AppDangerBrush}"
+                            Symbol="ErrorCircle24" />
+                        <!-- 加粗部分对齐原型 validBanner 的 <b>祖先校验失败</b>（所有者反馈：失败字体加粗） -->
+                        <TextBlock
+                            Margin="10,0,0,0"
+                            VerticalAlignment="Center"
+                            Style="{StaticResource AppBannerText}"
+                            FontWeight="Bold"
+                            Text="祖先校验失败" />
+                        <TextBlock
+                            Margin="6,0,0,0"
+                            VerticalAlignment="Center"
+                            Style="{StaticResource AppBannerText}"
+                            Text="— Head 提交" />
+                        <Border Margin="6,0" Style="{StaticResource AppMonoChip}">
+                            <TextBlock Style="{StaticResource AppMonoChipText}" Text="{Binding RangeHeadHash}" />
+                        </Border>
+                        <TextBlock
+                            VerticalAlignment="Center"
+                            Style="{StaticResource AppBannerText}"
+                            Text="不是基准提交" />
+                        <Border Margin="6,0" Style="{StaticResource AppMonoChip}">
+                            <TextBlock Style="{StaticResource AppMonoChipText}" Text="{Binding RangeBaseHash}" />
+                        </Border>
+                        <TextBlock
+                            VerticalAlignment="Center"
+                            Style="{StaticResource AppBannerText}"
+                            Text="的后代。请调整选择，否则无法导出。" />
+                    </StackPanel>
+                </Border>
+
+                <Border>
+                    <Border.Style>
+                        <Style BasedOn="{StaticResource AppWarningBanner}" TargetType="Border">
+                            <Setter Property="Margin" Value="0,0,0,16" />
+                            <Setter Property="Visibility" Value="Collapsed" />
+                            <Style.Triggers>
+                                <DataTrigger Binding="{Binding AncestryState}" Value="Warn">
+                                    <Setter Property="Visibility" Value="Visible" />
+                                </DataTrigger>
+                            </Style.Triggers>
+                        </Style>
+                    </Border.Style>
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto" />
+                            <ColumnDefinition Width="*" />
+                        </Grid.ColumnDefinitions>
+                        <ui:SymbolIcon
+                            Grid.Column="0"
+                            FontSize="16"
+                            Foreground="{StaticResource AppWarnBrush}"
+                            Symbol="Warning24" />
+                        <TextBlock
+                            Grid.Column="1"
+                            Margin="10,0,0,0"
+                            Style="{StaticResource AppWarningText}"
+                            Text="{Binding AncestryNote}" />
+                    </Grid>
+                </Border>
+
+                <!--
                     提交选择区（原型 .pick-grid：双栏 1fr 1fr gap 18——
                     间隙单独成固定宽中列，星号列分的是含间隙的总宽，混进去会两栏不等宽）。
                 -->
@@ -331,55 +470,6 @@
 
                     <views:CommitColumnView Grid.Column="2" DataContext="{Binding HeadList}" />
                 </Grid>
-
-                <!--
-                    范围条（原型 .range-bar）：左右两个 chip + 双点符号 + 状态文案。
-                    Head 侧 chip 是强调色实底白字（原型 rngHead 的内联样式）。
-                -->
-                <Border Style="{StaticResource AppActionBar}">
-                    <Grid>
-                        <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="Auto" />
-                            <ColumnDefinition Width="Auto" />
-                            <ColumnDefinition Width="*" />
-                        </Grid.ColumnDefinitions>
-
-                        <ui:SymbolIcon
-                            Grid.Column="0"
-                            FontSize="16"
-                            Foreground="{StaticResource AppAccentBrush}"
-                            Symbol="ArrowSwap24" />
-
-                        <StackPanel
-                            Grid.Column="1"
-                            Margin="12,0,0,0"
-                            Orientation="Horizontal"
-                            VerticalAlignment="Center">
-                            <Border Style="{StaticResource AppMonoChip}">
-                                <TextBlock Style="{StaticResource AppMonoChipText}" Text="{Binding RangeBaseHash}" />
-                            </Border>
-                            <TextBlock
-                                Margin="8,0"
-                                VerticalAlignment="Center"
-                                FontSize="12.5"
-                                Foreground="{DynamicResource TextFillColorTertiaryBrush}"
-                                Text=".." />
-                            <Border Background="{StaticResource AppAccentBrush}" Style="{StaticResource AppMonoChip}">
-                                <TextBlock
-                                    Foreground="{StaticResource AppOnAccentBrush}"
-                                    Style="{StaticResource AppMonoChipText}"
-                                    Text="{Binding RangeHeadHash}" />
-                            </Border>
-                        </StackPanel>
-
-                        <TextBlock
-                            Grid.Column="2"
-                            Margin="14,0,0,0"
-                            VerticalAlignment="Center"
-                            Style="{StaticResource HintText}"
-                            Text="{Binding RangeText}" />
-                    </Grid>
-                </Border>
 
                 <!--
                     提交详情卡（ticket 07 新增，原型无对应物——验收要求选中单个提交可看完整预览：
@@ -513,6 +603,97 @@
             </StackPanel>
         </ScrollViewer>
 
-        <controls:WorkflowFooter Grid.Row="1" Margin="30,0,30,26" DataContext="{Binding Shell}" />
+        <!--
+            页脚左端 = 范围条（原型 .range-bar 的完整形态：swap 图标 + 双点 chips + 变更统计，
+            与步进按钮同条）。LeftContent 里的绑定用 RelativeSource 指回页面——
+            页脚的 DataContext 已桥接到 Shell，页面数据要绕回去取。
+        -->
+        <controls:WorkflowFooter Grid.Row="1" Margin="30,0,30,26" DataContext="{Binding Shell}">
+            <controls:WorkflowFooter.LeftContent>
+                <StackPanel Orientation="Horizontal">
+                    <ui:SymbolIcon
+                        VerticalAlignment="Center"
+                        FontSize="16"
+                        Foreground="{DynamicResource TextFillColorTertiaryBrush}"
+                        Symbol="ArrowSwap24" />
+
+                    <StackPanel Margin="12,0,0,0" Orientation="Horizontal" VerticalAlignment="Center">
+                        <Border Style="{StaticResource AppMonoChip}">
+                            <TextBlock
+                                Style="{StaticResource AppMonoChipText}"
+                                Text="{Binding DataContext.RangeBaseHash, RelativeSource={RelativeSource AncestorType=Page}}" />
+                        </Border>
+                        <TextBlock
+                            Margin="8,0"
+                            VerticalAlignment="Center"
+                            FontSize="12.5"
+                            Foreground="{DynamicResource TextFillColorTertiaryBrush}"
+                            Text=".." />
+                        <Border Background="{StaticResource AppAccentBrush}" Style="{StaticResource AppMonoChip}">
+                            <TextBlock
+                                Foreground="{StaticResource AppOnAccentBrush}"
+                                Style="{StaticResource AppMonoChipText}"
+                                Text="{Binding DataContext.RangeHeadHash, RelativeSource={RelativeSource AncestorType=Page}}" />
+                        </Border>
+                    </StackPanel>
+
+                    <!--
+                        统计（原型 .range-bar .count）：校验通过后显示「变更范围：N 个文件 · N 次提交」，
+                        数字加粗转主文字色、两段之间用原型的中点分隔；其余状态（引导 / 校验中 / 分叉 / 未完成）显示单一状态文案。
+                    -->
+                    <StackPanel Margin="14,0,0,0" Orientation="Horizontal">
+                        <StackPanel.Style>
+                            <Style TargetType="StackPanel">
+                                <Setter Property="Visibility" Value="Collapsed" />
+                                <Style.Triggers>
+                                    <DataTrigger Binding="{Binding DataContext.AncestryState, RelativeSource={RelativeSource AncestorType=Page}}" Value="Ok">
+                                        <Setter Property="Visibility" Value="Visible" />
+                                    </DataTrigger>
+                                </Style.Triggers>
+                            </Style>
+                        </StackPanel.Style>
+                        <TextBlock
+                            VerticalAlignment="Center"
+                            Style="{StaticResource HintText}"
+                            Text="变更范围：" />
+                        <TextBlock
+                            VerticalAlignment="Center"
+                            FontSize="12.5"
+                            FontWeight="SemiBold"
+                            Foreground="{DynamicResource TextFillColorPrimaryBrush}"
+                            Text="{Binding DataContext.RangeFilesText, RelativeSource={RelativeSource AncestorType=Page}}" />
+                        <TextBlock
+                            VerticalAlignment="Center"
+                            Style="{StaticResource HintText}"
+                            Text=" 个文件 · " />
+                        <TextBlock
+                            VerticalAlignment="Center"
+                            FontSize="12.5"
+                            FontWeight="SemiBold"
+                            Foreground="{DynamicResource TextFillColorPrimaryBrush}"
+                            Text="{Binding DataContext.RangeCommitCountText, RelativeSource={RelativeSource AncestorType=Page}}" />
+                        <TextBlock
+                            VerticalAlignment="Center"
+                            Style="{StaticResource HintText}"
+                            Text=" 次提交" />
+                    </StackPanel>
+
+                    <TextBlock
+                        Margin="14,0,0,0"
+                        VerticalAlignment="Center"
+                        Text="{Binding DataContext.RangeStatText, RelativeSource={RelativeSource AncestorType=Page}}">
+                        <TextBlock.Style>
+                            <Style BasedOn="{StaticResource HintText}" TargetType="TextBlock">
+                                <Style.Triggers>
+                                    <DataTrigger Binding="{Binding DataContext.AncestryState, RelativeSource={RelativeSource AncestorType=Page}}" Value="Ok">
+                                        <Setter Property="Visibility" Value="Collapsed" />
+                                    </DataTrigger>
+                                </Style.Triggers>
+                            </Style>
+                        </TextBlock.Style>
+                    </TextBlock>
+                </StackPanel>
+            </controls:WorkflowFooter.LeftContent>
+        </controls:WorkflowFooter>
     </Grid>
 </Page>
