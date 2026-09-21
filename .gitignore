@@ -9,6 +9,8 @@ publish/
 # AI 协作产物（不入版本库）
 /.workbuddy/
 /.scratch/
+# docs 全部私有（使用说明/ADR/agents 约定/测试报告等都不入库）；
+# 使用说明对外通过 Release 附件分发，README 截图放在根目录 assets/。
 /docs/
 /AGENTS.md
 /CONTEXT.md
