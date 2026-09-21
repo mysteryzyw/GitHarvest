@@ -1,9 +1,11 @@
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using GitHarvest.Core.Git;
+using GitHarvest.Core.History;
 using GitHarvest.Core.Interaction;
 using GitHarvest.Core.Navigation;
 using GitHarvest.Core.Settings;
+using System.Globalization;
 using System.IO;
 
 namespace GitHarvest.ViewModels;
@@ -11,22 +13,28 @@ namespace GitHarvest.ViewModels;
 /// <summary>
 /// 仓库页（工作流第 1 步）的状态：打开仓库、最近列表与 git 环境自检的引导。
 /// 只依赖 Core 的接口——<see cref="IGitService"/> 负责打开仓库，<see cref="ISettingsService"/>
-/// 负责最近列表与全局设置，<see cref="IGitEnvironmentService"/> 负责探测，
-/// <see cref="IFolderPicker"/> 由壳实现文件夹选择；本类不碰进程、文件系统与界面类型。
+/// 负责最近列表与全局设置，<see cref="IHistoryService"/> 负责导出历史统计（首页概览与「上次导出」），
+/// <see cref="IGitEnvironmentService"/> 负责探测，<see cref="IFolderPicker"/> 由壳实现文件夹选择；
+/// 本类不碰进程、文件系统与界面类型。
 /// </summary>
 public sealed partial class RepositoryViewModel : ObservableObject
 {
     private readonly IGitEnvironmentService _gitEnvironment;
     private readonly IGitService _gitService;
     private readonly ISettingsService _settings;
+    private readonly IHistoryService _history;
     private readonly IFolderPicker _folderPicker;
     private readonly IShellNavigator _navigator;
     private readonly IRepositorySession _session;
+
+    /// <summary>进入本页时取一次的导出历史统计：同一次渲染里的两个数字必然同源。</summary>
+    private readonly ExportHistoryStatistics _historyStatistics;
 
     /// <param name="shell">外壳状态，页面标题等仍由它提供。</param>
     /// <param name="gitEnvironment">git 环境自检（结果缓存，重复询问不会反复启动进程）。</param>
     /// <param name="gitService">打开仓库的 Git 操作。</param>
     /// <param name="settings">最近仓库列表与全局设置的来源。</param>
+    /// <param name="history">导出历史的统计来源（首页概览与最近卡片的「上次导出」）。</param>
     /// <param name="folderPicker">文件夹选择对话框（壳实现）。</param>
     /// <param name="navigator">用于跳到「全局设置」与「选择提交」。</param>
     /// <param name="session">当前仓库会话状态：打开成功后写入，供选择提交等后续步骤读取。</param>
@@ -35,6 +43,7 @@ public sealed partial class RepositoryViewModel : ObservableObject
         IGitEnvironmentService gitEnvironment,
         IGitService gitService,
         ISettingsService settings,
+        IHistoryService history,
         IFolderPicker folderPicker,
         IShellNavigator navigator,
         IRepositorySession session)
@@ -43,6 +52,7 @@ public sealed partial class RepositoryViewModel : ObservableObject
         ArgumentNullException.ThrowIfNull(gitEnvironment);
         ArgumentNullException.ThrowIfNull(gitService);
         ArgumentNullException.ThrowIfNull(settings);
+        ArgumentNullException.ThrowIfNull(history);
         ArgumentNullException.ThrowIfNull(folderPicker);
         ArgumentNullException.ThrowIfNull(navigator);
         ArgumentNullException.ThrowIfNull(session);
@@ -51,9 +61,12 @@ public sealed partial class RepositoryViewModel : ObservableObject
         _gitEnvironment = gitEnvironment;
         _gitService = gitService;
         _settings = settings;
+        _history = history;
         _folderPicker = folderPicker;
         _navigator = navigator;
         _session = session;
+
+        _historyStatistics = history.GetStatistics();
 
         ReloadRecentRepositories();
     }
@@ -109,8 +122,15 @@ public sealed partial class RepositoryViewModel : ObservableObject
     public string CommitCountDisplay =>
         OpenedRepository is { } repository ? repository.CommitCount.ToString() : "—";
 
-    /// <summary>概览卡：最近仓库数（ticket 11 落地首页统计前的其余三项占位）。</summary>
+    /// <summary>概览卡：最近仓库数。</summary>
     public string RecentCountDisplay => RecentRepositories.Count.ToString();
+
+    /// <summary>概览卡：历史更新包数（导出历史里的记录条数，用户故事 45）。</summary>
+    public string HistoryPackageCountDisplay =>
+        _historyStatistics.PackageCount.ToString(CultureInfo.InvariantCulture);
+
+    /// <summary>概览卡：最常用分支（导出历史里出现次数最多的分支）；还没有任何导出时显示「—」。</summary>
+    public string MostUsedBranchDisplay => _historyStatistics.MostUsedBranch ?? "—";
 
     /// <summary>概览卡：默认输出根目录（未设置时明确提示而不是空白）。</summary>
     public string DefaultOutputPathDisplay =>
@@ -249,8 +269,8 @@ public sealed partial class RepositoryViewModel : ObservableObject
     }
 
     /// <summary>
-    /// 最近列表条目：显示名取路径最后一段；上次选中分支来自每仓库状态（原型卡片的 meta 行），
-    /// 从未记录过时留空不显示（「上次导出」一列在 ticket 11 接导出历史后补齐）。
+    /// 最近列表条目：显示名取路径最后一段；上次选中分支来自每仓库状态、上次导出时间来自导出历史
+    /// （原型卡片的 meta 行），两者都没有时分别留空与显示「从未导出」。
     /// 图标色槽按列表序号轮换蓝 / 紫 / 绿（对应原型三张示例卡的配色）。
     /// </summary>
     private RecentRepositoryItem ToRecentItem(string repositoryPath, int index)
@@ -258,8 +278,30 @@ public sealed partial class RepositoryViewModel : ObservableObject
             repositoryPath,
             Path.GetFileName(repositoryPath.TrimEnd('\\', '/')),
             _settings.GetRepositoryState(repositoryPath).LastBranch,
+            FormatLastExport(_history.GetLastExportedAt(repositoryPath)),
             ColorSlot: index % 3);
+
+    /// <summary>
+    /// 「上次导出」文案。只到日期（原型就是「上次导出 2026-09-10」）：这一行是列表扫读用的，
+    /// 精确到分钟没有意义，反而把卡片挤满；同一天的多次导出看首页的包数就够了。
+    /// </summary>
+    private static string FormatLastExport(DateTimeOffset? lastExportedAt)
+        => lastExportedAt is { } time
+            ? $"上次导出 {time.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture)}"
+            : "从未导出";
 }
 
-/// <summary>首页最近仓库卡片的数据（显示名 + 完整路径 + 上次选中分支 + 图标色槽 0/1/2）。</summary>
-public sealed record RecentRepositoryItem(string FullPath, string DisplayName, string? LastBranch, int ColorSlot);
+/// <summary>
+/// 首页最近仓库卡片的数据：显示名 + 完整路径 + 上次选中分支 + 上次导出文案 + 图标色槽 0/1/2。
+/// </summary>
+/// <param name="FullPath">仓库根路径（一键重开时用它）。</param>
+/// <param name="DisplayName">卡片标题（路径最后一段）。</param>
+/// <param name="LastBranch">上次选中的分支；从未记录过为 <see langword="null"/>（不显示 chip）。</param>
+/// <param name="LastExportedDisplay">「上次导出 2026-09-10」或「从未导出」。</param>
+/// <param name="ColorSlot">图标配色槽（0/1/2 轮换蓝 / 紫 / 绿）。</param>
+public sealed record RecentRepositoryItem(
+    string FullPath,
+    string DisplayName,
+    string? LastBranch,
+    string LastExportedDisplay,
+    int ColorSlot);

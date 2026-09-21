@@ -357,7 +357,7 @@
                     </StackPanel>
                 </Border>
 
-                <!-- 右：概览统计（历史更新包与最常用分支在 ticket 11 接真实数据；原型 .hero-side：上下 20 左右 22 内边距） -->
+                <!-- 右：概览统计（四张卡都是真实数据：最近仓库数/默认输出根目录来自设置，历史更新包/最常用分支来自导出历史；原型 .hero-side：上下 20 左右 22 内边距） -->
                 <Border Grid.Column="2" Grid.Row="0">
                     <Border.Style>
                         <Style BasedOn="{StaticResource AppCard}" TargetType="Border">
@@ -411,14 +411,18 @@
 
                             <Border Grid.Column="2" Grid.Row="0" Style="{StaticResource StatCard}">
                                 <StackPanel>
-                                    <TextBlock Style="{StaticResource StatNumber}" Text="—" ToolTip="导出历史在后续版本提供" />
+                                    <TextBlock Style="{StaticResource StatNumber}" Text="{Binding HistoryPackageCountDisplay}" />
                                     <TextBlock Style="{StaticResource StatLabel}" Text="历史更新包" />
                                 </StackPanel>
                             </Border>
 
                             <Border Grid.Column="0" Grid.Row="1" Margin="0,10,0,0" Style="{StaticResource StatCard}">
                                 <StackPanel>
-                                    <TextBlock Style="{StaticResource StatNumber}" Text="—" ToolTip="导出历史在后续版本提供" />
+                                    <TextBlock
+                                        Style="{StaticResource StatNumber}"
+                                        Text="{Binding MostUsedBranchDisplay}"
+                                        TextTrimming="CharacterEllipsis"
+                                        ToolTip="{Binding MostUsedBranchDisplay}" />
                                     <TextBlock Style="{StaticResource StatLabel}" Text="最常用分支" />
                                 </StackPanel>
                             </Border>
@@ -550,8 +554,8 @@
                                         TextTrimming="CharacterEllipsis" />
 
                                     <!--
-                                        原型 meta 行：上次选中分支的等宽 chip（未记录过不显示）+ 上次导出时间。
-                                        导出历史在 ticket 11 接入，当前尚未有过导出，恒显示「从未导出」。
+                                        原型 meta 行：上次选中分支的等宽 chip（未记录过不显示）+ 上次导出时间
+                                        （导出历史里没有该仓库的记录时显示「从未导出」）。
                                     -->
                                     <StackPanel
                                         Margin="0,9,0,0"
@@ -578,8 +582,7 @@
                                             VerticalAlignment="Center"
                                             FontSize="11.5"
                                             Foreground="{DynamicResource TextFillColorTertiaryBrush}"
-                                            Text="从未导出"
-                                            ToolTip="导出历史在后续版本提供" />
+                                            Text="{Binding LastExportedDisplay}" />
                                     </StackPanel>
                                 </StackPanel>
 

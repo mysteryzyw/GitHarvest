@@ -18,6 +18,9 @@ public static class AppPaths
     /// <summary>每仓库状态文件名（上次输出路径/上次分支/最近仓库列表）。</summary>
     public const string RepositoryStateFileName = "repository-state.json";
 
+    /// <summary>导出历史文件名（JSONL：一行一条记录，只追加）。</summary>
+    public const string ExportHistoryFileName = "export-history.jsonl";
+
     /// <summary>数据目录：%APPDATA%\GitHarvest。</summary>
     public static string GetDataDirectory() => GetDataDirectory(ResolveRoamingAppDataDirectory());
 
@@ -38,6 +41,13 @@ public static class AppPaths
     /// <summary>在指定漫游应用数据根目录下解析每仓库状态文件。</summary>
     public static string GetRepositoryStateFilePath(string roamingAppDataDirectory)
         => Path.Combine(GetDataDirectory(roamingAppDataDirectory), RepositoryStateFileName);
+
+    /// <summary>导出历史文件：%APPDATA%\GitHarvest\export-history.jsonl。</summary>
+    public static string GetExportHistoryFilePath() => GetExportHistoryFilePath(ResolveRoamingAppDataDirectory());
+
+    /// <summary>在指定漫游应用数据根目录下解析导出历史文件。</summary>
+    public static string GetExportHistoryFilePath(string roamingAppDataDirectory)
+        => Path.Combine(GetDataDirectory(roamingAppDataDirectory), ExportHistoryFileName);
 
     /// <summary>日志目录：%APPDATA%\GitHarvest\logs。</summary>
     public static string GetLogDirectory() => GetLogDirectory(ResolveRoamingAppDataDirectory());

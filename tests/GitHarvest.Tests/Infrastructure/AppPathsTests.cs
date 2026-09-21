@@ -41,6 +41,14 @@ public class AppPathsTests
             AppPaths.GetRepositoryStateFilePath(RoamingRoot));
     }
 
+    [Fact]
+    public void 导出历史文件位于数据目录下()
+    {
+        Assert.Equal(
+            Path.Combine(RoamingRoot, "GitHarvest", "export-history.jsonl"),
+            AppPaths.GetExportHistoryFilePath(RoamingRoot));
+    }
+
     [Theory]
     [InlineData(@"C:\Users\tester\AppData\Roaming\")]
     [InlineData(@"C:\Users\tester\AppData\Roaming\\")]

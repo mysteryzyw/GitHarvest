@@ -1,6 +1,8 @@
 using System.Text;
+using System.Text.Json;
 using GitHarvest.Core.Export;
 using GitHarvest.Core.Git;
+using GitHarvest.Core.History;
 using GitHarvest.Tests.Support;
 
 namespace GitHarvest.Tests.Export;
@@ -201,12 +203,44 @@ public sealed class ExportSnapshotTests : IDisposable
         Assert.False(Directory.Exists(outputRoot));
     }
 
+    [Fact]
+    public async Task 真实导出会往导出历史追加一条记录()
+    {
+        var repositoryPath = await CreateRepositoryAsync("export-history-e2e");
+        await CommitFileAsync(repositoryPath, "a.txt", "旧内容", "c1");
+        var baseHash = await ResolveAsync(repositoryPath, "HEAD");
+        await CommitFileAsync(repositoryPath, "a.txt", "新内容", "c2");
+        var headHash = await ResolveAsync(repositoryPath, "HEAD");
+
+        // 这一次用真实的 HistoryService（落到临时目录的 JSONL），验证的是「真的写进了文件」。
+        var historyFilePath = Path.Combine(_directory.Path, "数据", "export-history.jsonl");
+        var outputRoot = Path.Combine(_directory.Path, "交付物");
+        var result = await CreateService(new HistoryService(historyFilePath, SilentLogger))
+            .ExportAsync(await RequestAsync(repositoryPath, baseHash, headHash, outputRoot));
+
+        Assert.True(result.IsSuccess, result.FailureMessage);
+
+        // 新实例模拟重启：统计与「上次导出」重启后依然在，说明记录真的落了盘。
+        var reopened = new HistoryService(historyFilePath, SilentLogger);
+        var statistics = reopened.GetStatistics();
+        Assert.Equal(1, statistics.PackageCount);
+        Assert.Equal("main", statistics.MostUsedBranch);
+        Assert.Equal(Moment, reopened.GetLastExportedAt(repositoryPath));
+
+        // 文件里就一行，且记录的是实际落地的输出路径（JSON 里反斜杠会转义，按 JSON 解析后比对）。
+        using var line = JsonDocument.Parse(File.ReadLines(historyFilePath).Single());
+        Assert.Equal(result.PackagePath!, line.RootElement.GetProperty("outputPath").GetString());
+    }
+
     public void Dispose() => _directory.Dispose();
 
-    private static ExportService CreateService()
+    private static ExportService CreateService(IHistoryService? historyService = null)
         => new(
             new GitService(StubGitEnvironment.Available(), new GitCliRunner(), SilentLogger),
             new GitHarvest.Core.Templates.TemplateService(new StubSettingsService(), SilentLogger),
+            // 默认用桩接住导出历史：真实 git 测试不该把历史写进用户目录；
+            // 「真写文件」这一条由 真实导出会往导出历史追加一条记录 显式覆盖。
+            historyService ?? new RecordingHistoryService(),
             SilentLogger);
 
     private Task<string> CreateRepositoryAsync(string name, int commitCount = 0)
@@ -218,7 +252,14 @@ public sealed class ExportSnapshotTests : IDisposable
         string baseHash,
         string headHash,
         string outputRoot)
-        => await CreateService().ExportAsync(new ExportRequest(
+        => await CreateService().ExportAsync(await RequestAsync(repositoryPath, baseHash, headHash, outputRoot));
+
+    private async Task<ExportRequest> RequestAsync(
+        string repositoryPath,
+        string baseHash,
+        string headHash,
+        string outputRoot)
+        => new(
             repositoryPath,
             outputRoot,
             "2026-09-20",
@@ -233,7 +274,7 @@ public sealed class ExportSnapshotTests : IDisposable
                 await ShortAsync(repositoryPath, headHash),
                 await SubjectAsync(repositoryPath, headHash),
                 AuthorName: "测试",
-                Moment)));
+                Moment));
 
     private async Task<string> ResolveAsync(string repositoryPath, string reference)
         => await GitOutputAsync(repositoryPath, ["rev-parse", reference]);

@@ -1,6 +1,7 @@
 using System.Text.Encodings.Web;
 using System.Text.Json;
 using System.Text.Json.Serialization;
+using GitHarvest.Core.Infrastructure;
 using Serilog;
 
 namespace GitHarvest.Core.Settings;
@@ -292,39 +293,15 @@ public sealed class SettingsService : ISettingsService
     };
 
     /// <summary>
-    /// 把仓库路径归一化为状态字典的键：完整路径形式、无结尾分隔符。
-    /// 大小写差异不在键里处理，而由状态字典的大小写不敏感比较器吸收。
+    /// 把仓库路径归一化为状态字典的键。规则与导出历史共用 <see cref="RepositoryPathKey"/>
+    /// ——同一个仓库在「设置记住的分支」与「导出历史里的最近导出」之间必须认同一套写法。
     /// </summary>
     private static string NormalizeRepositoryKey(string repositoryPath)
-    {
-        ArgumentException.ThrowIfNullOrWhiteSpace(repositoryPath);
-
-        var fullPath = Path.GetFullPath(repositoryPath.Trim());
-        var root = Path.GetPathRoot(fullPath) ?? string.Empty;
-
-        // 去掉结尾分隔符，避免同一目录因尾斜杠产生假差异；但盘根（如 C:\）去掉分隔符
-        // 会退化成 "C:"（相对当前目录的驱动器语义），因此截断结果比盘根还短时保持原样。
-        var trimmed = fullPath.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
-        return trimmed.Length > 0 && trimmed.Length >= root.Length ? trimmed : fullPath;
-    }
+        => RepositoryPathKey.Normalize(repositoryPath);
 
     /// <summary>容错版键归一化：手改文件里的怪路径不值得让加载失败，丢弃该条目即可。</summary>
     private static string? TryNormalizeRepositoryKey(string? repositoryPath)
-    {
-        if (string.IsNullOrWhiteSpace(repositoryPath))
-        {
-            return null;
-        }
-
-        try
-        {
-            return NormalizeRepositoryKey(repositoryPath);
-        }
-        catch (Exception exception) when (exception is ArgumentException or IOException or NotSupportedException)
-        {
-            return null;
-        }
-    }
+        => RepositoryPathKey.TryNormalize(repositoryPath);
 
     /// <summary>把反序列化出来的设置归一化：路径字段去首尾空白，空白与 null 一律按「未配置」存为空串。</summary>
     private static GlobalSettings Normalize(GlobalSettings settings) => new()

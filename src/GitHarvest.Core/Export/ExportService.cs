@@ -1,4 +1,5 @@
 using GitHarvest.Core.Git;
+using GitHarvest.Core.History;
 using GitHarvest.Core.Templates;
 using Serilog;
 
@@ -7,10 +8,11 @@ namespace GitHarvest.Core.Export;
 /// <summary>
 /// <see cref="IExportService"/> 的实现：导出编排的两步能力——
 /// 「导出前总预览」（祖先校验 → 双点差异 → 按变更类型汇总）与
-/// 「导出更新包」（范围 → 冲突预扫描 → 快照写出 → 更新说明）。
+/// 「导出更新包」（范围 → 冲突预扫描 → 快照写出 → 更新说明 → 导出历史）。
 /// git 访问全部经 <see cref="IGitService"/>（ADR-0001：本类不碰 git 进程；文件系统则归本类，
 /// 这是「快照写出」这一步的职责），因此单元测试可以 mock 该接口、只留真实临时目录来断言产物。
-/// 更新说明的文本由 <see cref="ITemplateService"/> 渲染（模板或页面编辑后的本次内容）。
+/// 更新说明的文本由 <see cref="ITemplateService"/> 渲染（模板或页面编辑后的本次内容）；
+/// 导出历史经 <see cref="IHistoryService"/> 追加。
 /// </summary>
 public sealed class ExportService : IExportService
 {
@@ -19,19 +21,27 @@ public sealed class ExportService : IExportService
 
     private readonly IGitService _gitService;
     private readonly ITemplateService _templateService;
+    private readonly IHistoryService _historyService;
     private readonly ILogger _logger;
 
     /// <param name="gitService">仓库级 Git 操作的唯一接口（范围计算与取文件内容都经它）。</param>
     /// <param name="templateService">更新说明的模板加载与占位符渲染。</param>
+    /// <param name="historyService">导出历史的追加（编排的最后一步：成功才记）。</param>
     /// <param name="logger">导出过程与失败原因写这里，便于排查。</param>
-    public ExportService(IGitService gitService, ITemplateService templateService, ILogger logger)
+    public ExportService(
+        IGitService gitService,
+        ITemplateService templateService,
+        IHistoryService historyService,
+        ILogger logger)
     {
         ArgumentNullException.ThrowIfNull(gitService);
         ArgumentNullException.ThrowIfNull(templateService);
+        ArgumentNullException.ThrowIfNull(historyService);
         ArgumentNullException.ThrowIfNull(logger);
 
         _gitService = gitService;
         _templateService = templateService;
+        _historyService = historyService;
         _logger = logger;
     }
 
@@ -144,6 +154,8 @@ public sealed class ExportService : IExportService
                 result.BeforeFileCount,
                 result.AfterFileCount,
                 result.TotalBytes);
+
+            AppendHistory(request, packagePath);
 
             return result;
         }
@@ -391,6 +403,22 @@ public sealed class ExportService : IExportService
         // 编辑器给出的是 Windows 换行：统一成 LF，跨工具打开不窜行（与 UTF-8 无 BOM 同为兼容性约定）。
         return rendered.Content.Replace("\r\n", "\n");
     }
+
+    /// <summary>
+    /// 追加导出历史（编排的最后一步，spec 用户故事 45）：只有成功产出更新包才记一条——
+    /// 空范围、冲突中止、失败与取消都不产生记录，历史里出现的每个更新包都是真实存在的产物。
+    /// 时间取请求里的发起时刻（Core 不读系统时钟），与更新日期目录名、更新说明里的日期同源；
+    /// 输出路径记实际落地的目录（含重名让位后的名字）。
+    /// 写入失败由 <see cref="IHistoryService"/> 自己降级为 Warning，不改变本次导出的结论。
+    /// </summary>
+    private void AppendHistory(ExportRequest request, string packagePath)
+        => _historyService.Append(new ExportHistoryEntry(
+            request.RequestedAt,
+            request.RepositoryPath,
+            request.BranchName,
+            request.Base.ShortHash,
+            request.Head.ShortHash,
+            packagePath));
 
     /// <summary>
     /// 递归删除未完成的更新包目录。删除失败只记 Warning：原始失败（或取消）才是要给用户的结论，

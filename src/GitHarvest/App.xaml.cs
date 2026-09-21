@@ -3,6 +3,7 @@ using System.Windows;
 using System.Windows.Media;
 using GitHarvest.Core.Export;
 using GitHarvest.Core.Git;
+using GitHarvest.Core.History;
 using GitHarvest.Core.Infrastructure;
 using GitHarvest.Core.Interaction;
 using GitHarvest.Core.Navigation;
@@ -79,6 +80,7 @@ public partial class App : Application
 
         // Core 服务：导航目录 + git 访问基础设施（ticket 02）+ 设置与 JSON 持久化（ticket 03）
         // + 仓库级 Git 操作（ticket 04）+ 导出编排（ticket 08：导出前总预览起步）
+        // + 导出历史（ticket 11：导出时追加、首页统计来源）
         services.AddSingleton<INavigationCatalog, NavigationCatalog>();
         services.AddSingleton(provider => GitExecutableLocator.ForCurrentEnvironment());
         services.AddSingleton<GitCliRunner>();
@@ -91,6 +93,9 @@ public partial class App : Application
         services.AddSingleton<IGitEnvironmentService, GitEnvironmentService>();
         services.AddSingleton<IGitService, GitService>();
         services.AddSingleton<ITemplateService, TemplateService>();
+        services.AddSingleton<IHistoryService>(provider => new HistoryService(
+            AppPaths.GetExportHistoryFilePath(),
+            provider.GetRequiredService<ILogger>()));
         services.AddSingleton<IExportService, ExportService>();
 
         // 壳向 ViewModel 提供的交互接缝：文件夹选择对话框与「打开输出文件夹」

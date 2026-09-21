@@ -1,6 +1,7 @@
 using System.Text;
 using GitHarvest.Core.Export;
 using GitHarvest.Core.Git;
+using GitHarvest.Core.History;
 using GitHarvest.Core.Templates;
 using GitHarvest.Tests.Support;
 
@@ -277,6 +278,102 @@ public sealed class ExportOrchestrationTests : IDisposable
     }
 
     [Fact]
+    public async Task 导出成功后追加一条导出历史()
+    {
+        var history = new RecordingHistoryService();
+        var outputRoot = Path.Combine(_directory.Path, "输出");
+
+        var result = await CreateService(GitWithOneAddedFile(), historyService: history)
+            .ExportAsync(Request(outputRoot));
+
+        Assert.True(result.IsSuccess, result.FailureMessage);
+
+        // 一条导出 = 一条记录：时间 / 仓库 / 变更范围 / 输出路径（spec 用户故事 45）。
+        var entry = Assert.Single(history.Entries);
+        Assert.Equal(RequestedAt, entry.ExportedAt);
+        Assert.Equal(@"D:\Code\DemoService", entry.RepositoryPath);
+        Assert.Equal("main", entry.BranchName);
+        Assert.Equal("a1b2c3d", entry.BaseHash);
+        Assert.Equal("e4f5g6h", entry.HeadHash);
+        // 记录的是实际落地的目录（含重名让位后的名字），不是请求里的原始目录名。
+        Assert.Equal(result.PackagePath, entry.OutputPath);
+    }
+
+    [Fact]
+    public async Task 空变更范围不产生导出历史()
+    {
+        var history = new RecordingHistoryService();
+
+        var result = await CreateService(
+            new FakeGitService { IsAncestor = true, Files = [] },
+            historyService: history).ExportAsync(Request(Path.Combine(_directory.Path, "空范围")));
+
+        Assert.Equal(ExportOutcome.EmptyRange, result.Outcome);
+        Assert.Empty(history.Entries);
+    }
+
+    [Fact]
+    public async Task 文件系统冲突中止时不产生导出历史()
+    {
+        var history = new RecordingHistoryService();
+        var git = new FakeGitService
+        {
+            IsAncestor = true,
+            Files = [ChangedFile("src/a:b.cs", ChangeKind.Added, null, "b1")],
+            Blobs = new Dictionary<string, byte[]>(StringComparer.Ordinal) { ["b1"] = Bytes("1") },
+        };
+
+        var result = await CreateService(git, historyService: history)
+            .ExportAsync(Request(Path.Combine(_directory.Path, "冲突")));
+
+        Assert.Equal(ExportOutcome.ConflictBlocked, result.Outcome);
+        Assert.Empty(history.Entries);
+    }
+
+    [Fact]
+    public async Task 导出失败不产生导出历史()
+    {
+        var history = new RecordingHistoryService();
+        var git = new FakeGitService
+        {
+            IsAncestor = true,
+            Files = [ChangedFile("a.cs", ChangeKind.Added, null, "b-missing")],
+        };
+
+        var result = await CreateService(git, historyService: history)
+            .ExportAsync(Request(Path.Combine(_directory.Path, "失败")));
+
+        Assert.Equal(ExportOutcome.Failed, result.Outcome);
+        Assert.Empty(history.Entries);
+    }
+
+    [Fact]
+    public async Task 导出被取消不产生导出历史()
+    {
+        var history = new RecordingHistoryService();
+        using var cancellation = new CancellationTokenSource();
+        var git = new FakeGitService
+        {
+            IsAncestor = true,
+            Files = [ChangedFile("a.cs", ChangeKind.Added, null, "b1")],
+            Blobs = new Dictionary<string, byte[]>(StringComparer.Ordinal) { ["b1"] = Bytes("内容") },
+        };
+
+        var progress = new ProgressReporter(report =>
+        {
+            if (report.Phase == ExportPhase.WritingSnapshots)
+            {
+                cancellation.Cancel();
+            }
+        });
+
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(() => CreateService(git, historyService: history)
+            .ExportAsync(Request(Path.Combine(_directory.Path, "取消")), progress, cancellation.Token));
+
+        Assert.Empty(history.Entries);
+    }
+
+    [Fact]
     public async Task 进度按阶段推进到满()
     {
         var git = new FakeGitService
@@ -517,8 +614,15 @@ public sealed class ExportOrchestrationTests : IDisposable
     private static readonly Serilog.ILogger SilentLogger =
         new Serilog.LoggerConfiguration().CreateLogger();
 
-    private static ExportService CreateService(FakeGitService git, ITemplateService? templateService = null)
-        => new(git, templateService ?? CreateTemplateService(), SilentLogger);
+    /// <summary>发起导出的时刻（导出历史与更新日期目录名同源，因此测试里统一取它）。</summary>
+    private static readonly DateTimeOffset RequestedAt =
+        new(2026, 9, 20, 13, 45, 0, TimeSpan.FromHours(8));
+
+    private static ExportService CreateService(
+        FakeGitService git,
+        ITemplateService? templateService = null,
+        IHistoryService? historyService = null)
+        => new(git, templateService ?? CreateTemplateService(), historyService ?? new RecordingHistoryService(), SilentLogger);
 
     /// <summary>默认只给内置模板（不碰磁盘的桩设置）；自定义模板场景由调用方显式构造。</summary>
     private static TemplateService CreateTemplateService(StubSettingsService? settings = null)
@@ -543,7 +647,7 @@ public sealed class ExportOrchestrationTests : IDisposable
             RepositoryPath: @"D:\Code\DemoService",
             OutputRootPath: outputRoot,
             FolderName: folderName,
-            RequestedAt: new DateTimeOffset(2026, 9, 20, 13, 45, 0, TimeSpan.FromHours(8)),
+            RequestedAt: RequestedAt,
             BranchName: "main",
             Base: new CommitSummary("a1b2c3d", "chore(release): 2.4.0 版本冻结", "王磊", DateTimeOffset.Now),
             Head: new CommitSummary("e4f5g6h", "feat(export): 支持更新说明模板占位符", "张伟", DateTimeOffset.Now));
