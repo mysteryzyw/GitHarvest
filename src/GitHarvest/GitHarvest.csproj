@@ -1,4 +1,4 @@
-﻿<Project Sdk="Microsoft.NET.Sdk">
+<Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
     <OutputType>WinExe</OutputType>
@@ -8,7 +8,18 @@
     <AssemblyName>GitHarvest</AssemblyName>
     <!-- 应用清单：声明长路径支持（ticket 09 的验收项）。文件里刻意只加 longPathAware，理由见其注释。 -->
     <ApplicationManifest>app.manifest</ApplicationManifest>
+    <!-- exe 图标（ticket 13）：嵌入 PE 资源，资源管理器/任务栏显示它；文件同时以 Resource
+         参与编译（见下），供标题栏与关于页用 pack URI 引用同一份。 -->
+    <ApplicationIcon>Assets\AppIcon.ico</ApplicationIcon>
+    <AssemblyVersion>1.0.0.0</AssemblyVersion>
+    <FileVersion>1.0.0.0</FileVersion>
+    <Version>1.0.0</Version>
   </PropertyGroup>
+
+  <ItemGroup>
+    <!-- ico 作为 WPF 资源：XAML 的 Source="/Assets/AppIcon.ico" 从这里解析 -->
+    <Resource Include="Assets\AppIcon.ico" />
+  </ItemGroup>
 
   <ItemGroup>
     <PackageReference Include="CommunityToolkit.Mvvm" Version="8.4.2" />

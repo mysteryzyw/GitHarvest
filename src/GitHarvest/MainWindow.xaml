@@ -14,7 +14,8 @@
     UseLayoutRounding="True"
     WindowBackdropType="Mica"
     WindowCornerPreference="Round"
-    WindowStartupLocation="CenterScreen">
+    WindowStartupLocation="CenterScreen"
+    Icon="pack://application:,,,/GitHarvest;component/Assets/AppIcon.ico">
 
     <!--
         应用外壳：标题栏在上，其下是左侧导航（四步工作流 + 全局设置 / 关于）与内容区。
@@ -46,7 +47,20 @@
             Height="40"
             Title="GitHarvest">
             <ui:TitleBar.Icon>
-                <ui:SymbolIcon Foreground="{StaticResource AppAccentBrush}" Symbol="BranchFork24" />
+                <!--
+                    应用图标（ticket 13）：与 exe/任务栏同一份 Assets/AppIcon.ico，
+                    形状取自原型的 #i-logo（三圆枝杈）。窗口的 Icon 属性（上方）管任务栏，
+                    这里管标题栏上的可见图标——两处都要设，缺一则任务栏退回系统默认。
+                    两个坑（冒烟实测）：
+                    ① 必须是 ui:ImageIcon（IconElement 派生），TitleBar.Icon 不收普通 Image，
+                       收了启动即抛 XamlParseException；
+                    ② Source 用绝对 pack URI（指名 GitHarvest;component）——相对形式 "/Assets/…"
+                       从入口程序集解析，ui-check（入口是 UiCheck.exe）会抛「找不到资源」。
+                -->
+                <ui:ImageIcon
+                    Width="18"
+                    Height="18"
+                    Source="pack://application:,,,/GitHarvest;component/Assets/AppIcon.ico" />
             </ui:TitleBar.Icon>
         </ui:TitleBar>
 

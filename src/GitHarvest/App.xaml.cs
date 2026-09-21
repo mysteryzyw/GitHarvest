@@ -1,4 +1,4 @@
-﻿using System.Reflection;
+using System.Reflection;
 using System.Windows;
 using System.Windows.Media;
 using GitHarvest.Core.Export;
@@ -30,6 +30,13 @@ public partial class App : Application
     {
         base.OnStartup(e);
 
+
+        // 启动耗时基线（ticket 13 验收：体积与启动时间记录为后续优化基线）。
+        // 从 OnStartup 进入起算到主窗口显示，日志里「主窗口已显示」一行就是测量点；
+        // 单文件发布压缩包的解压发生在这之前（进程启动时），因此这行数字不含解压耗时，
+        // 但用户体感的启动差距主要在进程创建阶段，二者分开记录才不会互相污染结论。
+        var startupStopwatch = System.Diagnostics.Stopwatch.StartNew();
+
         // 数据目录先解析：它可能在别处（设置页改过），日志、设置、每仓库状态、导出历史都从它派生。
         // 它在日志起来之前构造，因此容错提示（指针文件坏了、目录被删了）要等日志起来再补记。
         var dataLocation = new DataLocation();
@@ -56,6 +63,7 @@ public partial class App : Application
 
         var window = _services.GetRequiredService<MainWindow>();
 
+
         // 主题：按设置里的默认主题（浅色/深色/跟随系统）在**显示窗口之前**应用，
         // 免得先闪一帧浅色再跳成深色。「跟随系统」会在这里把窗口交给 WpfUI 的主题监视器，
         // 因此必须先有窗口实例再应用主题。强调色也由它统一覆盖为原型的 #0067C0
@@ -63,6 +71,9 @@ public partial class App : Application
         _services.GetRequiredService<IThemeService>().Apply(settings.Settings.DefaultTheme);
 
         window.Show();
+
+        // 启动耗时基线（ticket 13）：日志里 grep「主窗口已显示」即可读出，发布体积见使用说明。
+        Log.Information("主窗口已显示，自启动耗时 {StartupMs} 毫秒", startupStopwatch.ElapsedMilliseconds);
 
         // git 环境自检：放在窗口显示之后——探测要启动 git 子进程（几十毫秒），不该拖慢首屏。
         // 结果写进日志（版本、来源、路径），首页的引导横幅也复用这份缓存。

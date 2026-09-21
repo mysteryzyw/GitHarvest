@@ -30,11 +30,14 @@
                 </Border.Style>
 
                 <StackPanel HorizontalAlignment="Center">
-                    <ui:SymbolIcon
+                    <!-- 应用图标（ticket 13）：与 exe/标题栏同一份 Assets/AppIcon.ico，替代原 BranchFork24 占位；
+                         绝对 pack URI 与入口程序集无关（相对形式在 ui-check 里解析不到） -->
+                    <Image
+                        Width="44"
+                        Height="44"
                         HorizontalAlignment="Center"
-                        FontSize="44"
-                        Foreground="{StaticResource AppAccentBrush}"
-                        Symbol="BranchFork24" />
+                        RenderOptions.BitmapScalingMode="HighQuality"
+                        Source="pack://application:,,,/GitHarvest;component/Assets/AppIcon.ico" />
 
                     <TextBlock
                         Margin="0,12,0,0"
