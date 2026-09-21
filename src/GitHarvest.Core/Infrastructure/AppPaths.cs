@@ -21,6 +21,12 @@ public static class AppPaths
     /// <summary>导出历史文件名（JSONL：一行一条记录，只追加）。</summary>
     public const string ExportHistoryFileName = "export-history.jsonl";
 
+    /// <summary>
+    /// 数据目录指针文件名。它**固定在默认数据目录下**（不随自定义数据目录迁移），
+    /// 是「数据目录被改到哪儿」的唯一真相源——把位置配置放进被配置的目录里会形成自指循环。
+    /// </summary>
+    public const string LocationFileName = "location.json";
+
     /// <summary>数据目录：%APPDATA%\GitHarvest。</summary>
     public static string GetDataDirectory() => GetDataDirectory(ResolveRoamingAppDataDirectory());
 
@@ -48,6 +54,16 @@ public static class AppPaths
     /// <summary>在指定漫游应用数据根目录下解析导出历史文件。</summary>
     public static string GetExportHistoryFilePath(string roamingAppDataDirectory)
         => Path.Combine(GetDataDirectory(roamingAppDataDirectory), ExportHistoryFileName);
+
+    /// <summary>数据目录指针文件（固定位置，永远在默认数据目录下）：%APPDATA%\GitHarvest\location.json。</summary>
+    public static string GetLocationFilePath() => GetLocationFilePath(ResolveRoamingAppDataDirectory());
+
+    /// <summary>在指定漫游应用数据根目录下解析数据目录指针文件。</summary>
+    public static string GetLocationFilePath(string roamingAppDataDirectory)
+        => Path.Combine(GetDataDirectory(roamingAppDataDirectory), LocationFileName);
+
+    /// <summary>漫游应用数据根目录（%APPDATA%）：<see cref="DataLocation"/> 解析自定义数据目录时要用它。</summary>
+    public static string GetRoamingAppDataDirectory() => ResolveRoamingAppDataDirectory();
 
     /// <summary>日志目录：%APPDATA%\GitHarvest\logs。</summary>
     public static string GetLogDirectory() => GetLogDirectory(ResolveRoamingAppDataDirectory());

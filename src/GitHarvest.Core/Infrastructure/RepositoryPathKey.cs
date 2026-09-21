@@ -12,20 +12,12 @@ public static class RepositoryPathKey
     /// <summary>
     /// 归一化仓库路径：完整路径形式、去掉结尾分隔符。
     /// 路径本身非法（空串）时抛出 <see cref="ArgumentException"/>——这是调用方的编程错误。
+    /// 具体归一化规则与「数据目录路径」共用 <see cref="PathRelation.NormalizeDirectory"/>：
+    /// 同一台机器上的目录路径，不该有两套「什么算同一个路径」的理解。
     /// </summary>
     /// <param name="repositoryPath">仓库目录（仓库根或其子目录）。</param>
     public static string Normalize(string repositoryPath)
-    {
-        ArgumentException.ThrowIfNullOrWhiteSpace(repositoryPath);
-
-        var fullPath = Path.GetFullPath(repositoryPath.Trim());
-        var root = Path.GetPathRoot(fullPath) ?? string.Empty;
-
-        // 去掉结尾分隔符，避免同一目录因尾斜杠产生假差异；但盘根（如 C:\）去掉分隔符
-        // 会退化成 "C:"（相对当前目录的驱动器语义），因此截断结果比盘根还短时保持原样。
-        var trimmed = fullPath.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
-        return trimmed.Length > 0 && trimmed.Length >= root.Length ? trimmed : fullPath;
-    }
+        => PathRelation.NormalizeDirectory(repositoryPath);
 
     /// <summary>容错版归一化：手改文件里的怪路径不值得让整份数据加载失败，返回 <see langword="null"/> 丢弃该条即可。</summary>
     /// <param name="repositoryPath">可能为空白或非法的路径。</param>

@@ -17,16 +17,10 @@ namespace GitHarvest.Core.Settings;
 /// </summary>
 public sealed class SettingsService : ISettingsService
 {
-    private static readonly JsonSerializerOptions SerializerOptions = new()
-    {
-        PropertyNameCaseInsensitive = true,
-        ReadCommentHandling = JsonCommentHandling.Skip,
-        AllowTrailingCommas = true,
-        WriteIndented = true,
-        // 默认编码器会把中文转义成 \uXXXX，手改文件就不直观了；这是本应用自有文件而非 Web 报文，允许直接输出。
-        Encoder = JavaScriptEncoder.UnsafeRelaxedJsonEscaping,
-        Converters = { new JsonStringEnumConverter() },
-    };
+    /// <summary>
+    /// 序列化选项取自公共约定（<see cref="JsonFileOptions"/> 的缩进档）：宽容解析、中文不转义、缩进输出。
+    /// </summary>
+    private static readonly JsonSerializerOptions SerializerOptions = JsonFileOptions.HumanEditable;
 
     private readonly object _gate = new();
     private readonly string _settingsFilePath;
@@ -37,8 +31,9 @@ public sealed class SettingsService : ISettingsService
     private RepositoryStateDocument _state;
 
     /// <summary>构造时一次性加载 settings.json 与 repository-state.json，之后所有访问都走内存快照。</summary>
-    /// <param name="settingsFilePath">settings.json 的路径，通常取自 <c>AppPaths.GetSettingsFilePath()</c>。</param>
-    /// <param name="repositoryStateFilePath">每仓库状态文件的路径，通常取自 <c>AppPaths.GetRepositoryStateFilePath()</c>。</param>
+    /// <param name="settingsFilePath">settings.json 的路径，取自 <c>IDataLocation.SettingsFilePath</c>
+    /// （数据目录可被改到别处，因此不能在这里自己拼 %APPDATA%）。</param>
+    /// <param name="repositoryStateFilePath">每仓库状态文件的路径，取自 <c>IDataLocation.RepositoryStateFilePath</c>。</param>
     /// <param name="logger">设置读写日志（缺失/损坏回退记 Warning，设置保存记 Info）。</param>
     public SettingsService(string settingsFilePath, string repositoryStateFilePath, ILogger logger)
     {
@@ -153,6 +148,20 @@ public sealed class SettingsService : ISettingsService
                 return string.IsNullOrWhiteSpace(value) ? null : value;
             }
         }
+    }
+
+    /// <inheritdoc />
+    public void Reload()
+    {
+        lock (_gate)
+        {
+            // 与构造时同一段加载逻辑：文件缺失会按默认值重新生成（首次启动的既有行为），
+            // 损坏则回退默认并保留原文件——「重置全部数据」之后正是这个路径。
+            _settings = LoadSettings();
+            _state = LoadState();
+        }
+
+        _logger.Information("已从磁盘重新加载全局设置与每仓库状态：{SettingsFilePath}", _settingsFilePath);
     }
 
     /// <summary>
@@ -310,37 +319,19 @@ public sealed class SettingsService : ISettingsService
         DefaultTemplatePath = NormalizeText(settings.DefaultTemplatePath),
         DefaultTheme = settings.DefaultTheme,
         GitExecutablePath = NormalizeText(settings.GitExecutablePath),
+        // 保留天数：负数一律归 0（= 不自动清理）。0 表达「不清理」是设置页的滑块/输入框能选到的值，
+        // 而负数没有任何意义，手改文件写 -1 时按用户最可能的本意（别删）处理。
+        DataRetentionDays = Math.Max(0, settings.DataRetentionDays),
     };
 
     private static string NormalizeText(string? value) => value?.Trim() ?? string.Empty;
 
-    /// <summary>先把内容写入同目录的临时文件，再原子替换到目标路径，避免进程中断留下半个 JSON。</summary>
+    /// <summary>
+    /// 先把内容写入同目录的临时文件，再原子替换到目标路径，避免进程中断留下半个 JSON。
+    /// 实现见 <see cref="AtomicFile"/>——数据目录指针文件也用同一段代码。
+    /// </summary>
     private static void WriteAtomically(string filePath, string content)
-    {
-        var directory = Path.GetDirectoryName(filePath);
-        if (!string.IsNullOrEmpty(directory))
-        {
-            Directory.CreateDirectory(directory);
-        }
-
-        var temporaryPath = Path.Combine(
-            directory ?? string.Empty,
-            $".{Path.GetFileName(filePath)}.{Guid.NewGuid():N}.tmp");
-
-        try
-        {
-            // File.WriteAllText 默认即 UTF-8 无 BOM。
-            File.WriteAllText(temporaryPath, content);
-            File.Move(temporaryPath, filePath, overwrite: true);
-        }
-        finally
-        {
-            if (File.Exists(temporaryPath))
-            {
-                File.Delete(temporaryPath);
-            }
-        }
-    }
+        => AtomicFile.WriteAllText(filePath, content);
 
     /// <summary>repository-state.json 的文件结构（内部契约）：最近仓库列表 + 按仓库根路径索引的状态字典。</summary>
     private sealed record RepositoryStateDocument

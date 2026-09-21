@@ -28,4 +28,18 @@ public interface IHistoryService
     /// <param name="repositoryPath">仓库根路径。</param>
     /// <exception cref="ArgumentException"><paramref name="repositoryPath"/> 为空白。</exception>
     DateTimeOffset? GetLastExportedAt(string repositoryPath);
+
+    /// <summary>
+    /// 重新从磁盘读取全部记录，丢弃内存快照。用于「文件被外部改动」的场景——
+    /// 设置页的清理与重置删掉了历史文件，而内存里还留着旧记录，不重载会让首页统计一直显示旧数字。
+    /// </summary>
+    void Reload();
+
+    /// <summary>
+    /// 删掉导出时间早于 <paramref name="cutoff"/> 的记录（重写文件，非追加），返回删掉的条数。
+    /// 重写失败时不动内存快照——磁盘是真相，内存跟着它走，不出现「界面少了、文件里还在」的分裂。
+    /// </summary>
+    /// <param name="cutoff">时间界限；早于它的记录被删。</param>
+    /// <returns>删掉的记录条数；没有可删的或写盘失败时为 0。</returns>
+    int PruneBefore(DateTimeOffset cutoff);
 }

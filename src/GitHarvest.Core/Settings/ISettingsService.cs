@@ -35,4 +35,12 @@ public interface ISettingsService : IGitExecutablePathProvider
 
     /// <summary>把仓库加入（或移到）最近列表首位并立即持久化。</summary>
     void AddRecentRepository(string repositoryPath);
+
+    /// <summary>
+    /// 从磁盘重新加载设置与每仓库状态，丢弃内存快照。
+    /// 用于「磁盘被外部改动」的场景——设置页的「重置全部数据」删掉了这些文件，
+    /// 而内存里还留着旧值，不重载就会出现「界面显示已重置、首页仍显示旧统计」的分裂。
+    /// 文件缺失时按默认值重新生成（与首次启动同一路径），读取失败仍按容错口径回退并记 Warning。
+    /// </summary>
+    void Reload();
 }

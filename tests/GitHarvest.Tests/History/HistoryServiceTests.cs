@@ -205,6 +205,66 @@ public sealed class HistoryServiceTests : IDisposable
             () => service.Append(Entry(Moment, "  ", "main")));
     }
 
+    [Fact]
+    public void 按时间清理只删过期记录并让新实例读回同一结果()
+    {
+        var service = CreateService();
+        service.Append(Entry(Moment.AddDays(-40), @"D:\Code\Old", "main"));
+        service.Append(Entry(Moment.AddDays(-35), @"D:\Code\Old", "main"));
+        service.Append(Entry(Moment.AddDays(-2), @"D:\Code\New", "release/2.4"));
+
+        var removed = service.PruneBefore(Moment.AddDays(-30));
+
+        Assert.Equal(2, removed);
+        Assert.Equal(1, service.GetStatistics().PackageCount);
+        Assert.Null(service.GetLastExportedAt(@"D:\Code\Old"));
+
+        // 磁盘上也要只剩一条：清理不是只改内存。
+        var reopened = CreateService();
+        Assert.Equal(1, reopened.GetStatistics().PackageCount);
+        Assert.Equal(Moment.AddDays(-2), reopened.GetLastExportedAt(@"D:\Code\New"));
+    }
+
+    [Fact]
+    public void 按时间清理没有可删项时返回零且文件不动()
+    {
+        var service = CreateService();
+        service.Append(Entry(Moment.AddDays(-1), @"D:\Code\Demo", "main"));
+        var before = File.ReadAllText(HistoryFilePath);
+
+        Assert.Equal(0, service.PruneBefore(Moment.AddDays(-30)));
+        Assert.Equal(before, File.ReadAllText(HistoryFilePath));
+    }
+
+    [Fact]
+    public void 重载会丢弃内存快照并重新读盘()
+    {
+        var service = CreateService();
+        service.Append(Entry(Moment, @"D:\Code\Demo", "main"));
+        Assert.Equal(1, service.GetStatistics().PackageCount);
+
+        // 模拟「文件被外部改动」：直接往文件里再追加一行。
+        File.AppendAllText(HistoryFilePath, Line(Moment.AddHours(1), @"D:\Code\Other", "dev") + Environment.NewLine);
+
+        service.Reload();
+
+        Assert.Equal(2, service.GetStatistics().PackageCount);
+        Assert.Equal(Moment.AddHours(1), service.GetLastExportedAt(@"D:\Code\Other"));
+    }
+
+    [Fact]
+    public void 历史文件被删掉后重载视为空历史()
+    {
+        var service = CreateService();
+        service.Append(Entry(Moment, @"D:\Code\Demo", "main"));
+
+        File.Delete(HistoryFilePath);
+        service.Reload();
+
+        Assert.Equal(0, service.GetStatistics().PackageCount);
+        Assert.Null(service.GetLastExportedAt(@"D:\Code\Demo"));
+    }
+
     private HistoryService CreateService() => new(HistoryFilePath, SilentLogger);
 
     private static ExportHistoryEntry Entry(DateTimeOffset exportedAt, string repositoryPath, string branchName)

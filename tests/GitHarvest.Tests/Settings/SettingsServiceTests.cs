@@ -7,7 +7,7 @@ namespace GitHarvest.Tests.Settings;
 
 /// <summary>
 /// 全局设置的 JSON 持久化（settings.json）：
-/// 首次启动自动生成含四项默认值的文件；手写文件宽容解析（注释/尾逗号/大小写不敏感）；
+/// 首次启动自动生成含全部默认值的文件；手写文件宽容解析（注释/尾逗号/大小写不敏感）；
 /// 损坏或缺失时回退默认值并记 Warning，不崩溃；保存后的值在新实例（模拟重启）中保持。
 /// 只通过 <see cref="ISettingsService"/> 与磁盘上的 settings.json 观察外部行为。
 /// </summary>
@@ -23,7 +23,7 @@ public class SettingsServiceTests : IDisposable
     private string RepositoryStateFilePath => Path.Combine(_directory.Path, "repository-state.json");
 
     [Fact]
-    public void 首次启动自动生成含四项默认值的settings_json()
+    public void 首次启动自动生成含全部默认值的settings_json()
     {
         var logDirectory = Path.Combine(_directory.Path, "logs");
         using (var logger = LoggingSetup.ConfigureFileLogging(logDirectory))
@@ -31,7 +31,7 @@ public class SettingsServiceTests : IDisposable
             CreateService(logger);
         }
 
-        // 生成的文件本身就是可手改的持久化契约：四个顶层字段必须齐全且取默认值。
+        // 生成的文件本身就是可手改的持久化契约：全部顶层字段必须齐全且取默认值。
         // 字段名（含 gitExecutablePath）一经发布不得更改，否则破坏既有用户的手改文件。
         Assert.True(File.Exists(SettingsFilePath));
         using var document = JsonDocument.Parse(File.ReadAllText(SettingsFilePath));
@@ -40,10 +40,12 @@ public class SettingsServiceTests : IDisposable
         Assert.True(root.TryGetProperty("defaultTemplatePath", out var defaultTemplatePath));
         Assert.True(root.TryGetProperty("defaultTheme", out var defaultTheme));
         Assert.True(root.TryGetProperty("gitExecutablePath", out var gitExecutablePath));
+        Assert.True(root.TryGetProperty("dataRetentionDays", out var dataRetentionDays));
         Assert.Equal(string.Empty, defaultOutputPath.GetString());
         Assert.Equal(string.Empty, defaultTemplatePath.GetString());
         Assert.Equal("Light", defaultTheme.GetString());
         Assert.Equal(string.Empty, gitExecutablePath.GetString());
+        Assert.Equal(GlobalSettings.DefaultDataRetentionDays, dataRetentionDays.GetInt32());
 
         // 文件缺失按验收标准记 Warning（首次启动生成前的一次性提示，不影响启动）。
         var content = File.ReadAllText(Assert.Single(Directory.GetFiles(logDirectory, "log-*.txt")));
@@ -299,6 +301,47 @@ public class SettingsServiceTests : IDisposable
 
         // 落盘失败不得污染内存快照：内存与磁盘保持一致，用户重试即可。
         Assert.Equal(new GlobalSettings(), service.Settings);
+    }
+
+    [Fact]
+    public void 数据保留天数保存后重启保持()
+    {
+        var first = CreateService(SilentLogger);
+        first.Save(new GlobalSettings { DataRetentionDays = 7 });
+
+        Assert.Equal(7, CreateService(SilentLogger).Settings.DataRetentionDays);
+    }
+
+    [Theory]
+    [InlineData(-1)]
+    [InlineData(-30)]
+    public void 数据保留天数为负数时按零处理(int days)
+    {
+        // 0 是「不自动清理」（设置页能选到的值），负数没有任何意义；
+        // 手改文件写成负数时按用户最可能的本意处理——别删。
+        File.WriteAllText(SettingsFilePath, $$"""{ "dataRetentionDays": {{days}} }""");
+
+        Assert.Equal(0, CreateService(SilentLogger).Settings.DataRetentionDays);
+    }
+
+    [Fact]
+    public void 重载会重新读盘()
+    {
+        var service = CreateService(SilentLogger);
+        service.Save(new GlobalSettings { DefaultOutputPath = @"E:\更新包" });
+        service.AddRecentRepository(@"D:\Code\Demo");
+        Assert.Single(service.RecentRepositories);
+
+        // 模拟外部改动：把两个文件都删掉（设置页「重置全部数据」正是这个动作）。
+        File.Delete(SettingsFilePath);
+        File.Delete(RepositoryStateFilePath);
+
+        service.Reload();
+
+        // 内存快照换成盘上的新状态：设置回到默认值、最近仓库清空，设置文件按默认值重新生成。
+        Assert.True(File.Exists(SettingsFilePath));
+        Assert.Equal(string.Empty, service.Settings.DefaultOutputPath);
+        Assert.Empty(service.RecentRepositories);
     }
 
     public void Dispose() => _directory.Dispose();

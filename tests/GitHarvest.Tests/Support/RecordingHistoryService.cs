@@ -19,4 +19,14 @@ internal sealed class RecordingHistoryService : IHistoryService
 
     public DateTimeOffset? GetLastExportedAt(string repositoryPath)
         => Entries.Count == 0 ? null : Entries[^1].ExportedAt;
+
+    /// <summary>桩没有「磁盘」可重载，清空内存记录即为「重新读到空历史」。</summary>
+    public void Reload() => Entries.Clear();
+
+    /// <summary>桩的清理：删掉早于界限的记录并返回条数（真实的重写文件逻辑由真实实现承担）。</summary>
+    public int PruneBefore(DateTimeOffset cutoff)
+    {
+        var removed = Entries.RemoveAll(entry => entry.ExportedAt < cutoff);
+        return removed;
+    }
 }

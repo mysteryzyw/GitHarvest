@@ -15,15 +15,11 @@ namespace GitHarvest.Core.History;
 /// </summary>
 public sealed class HistoryService : IHistoryService
 {
-    private static readonly JsonSerializerOptions SerializerOptions = new()
-    {
-        // 文件是给人看、给人改的：字段名大小写不敏感、允许尾逗号与注释。
-        PropertyNameCaseInsensitive = true,
-        ReadCommentHandling = JsonCommentHandling.Skip,
-        AllowTrailingCommas = true,
-        // 默认编码器会把中文路径转义成 \uXXXX，手改文件就不直观了（与 settings.json 同一取向）。
-        Encoder = JavaScriptEncoder.UnsafeRelaxedJsonEscaping,
-    };
+    /// <summary>
+    /// 序列化选项取自公共约定（<see cref="JsonFileOptions"/> 的逐行档）：宽容解析、中文不转义，
+    /// 但**不缩进**——一行一条记录，缩进会把文件撑大且不再是一行一条。
+    /// </summary>
+    private static readonly JsonSerializerOptions SerializerOptions = JsonFileOptions.LineDelimited;
 
     /// <summary>UTF-8 无 BOM：与更新说明、设置文件同一取向，跨工具打开不窜字符。</summary>
     private static readonly UTF8Encoding Utf8WithoutBom = new(encoderShouldEmitUTF8Identifier: false);
@@ -35,7 +31,7 @@ public sealed class HistoryService : IHistoryService
     /// <summary>已加载的记录（按追加顺序）；仓库路径键预先算好，避免每次查询重算。</summary>
     private readonly List<HistoryRow> _entries = [];
 
-    /// <param name="historyFilePath">导出历史文件路径，通常取自 <c>AppPaths.GetExportHistoryFilePath()</c>。</param>
+    /// <param name="historyFilePath">导出历史文件路径，取自 <c>IDataLocation.ExportHistoryFilePath</c>。</param>
     /// <param name="logger">读写问题（坏行、打不开文件）记 Warning 的地方。</param>
     public HistoryService(string historyFilePath, ILogger logger)
     {
@@ -111,6 +107,56 @@ public sealed class HistoryService : IHistoryService
             }
 
             return latest;
+        }
+    }
+
+    /// <inheritdoc />
+    public void Reload()
+    {
+        lock (_gate)
+        {
+            _entries.Clear();
+            Load();
+        }
+    }
+
+    /// <inheritdoc />
+    public int PruneBefore(DateTimeOffset cutoff)
+    {
+        lock (_gate)
+        {
+            var kept = _entries.Where(row => row.Entry.ExportedAt >= cutoff).ToList();
+            var removed = _entries.Count - kept.Count;
+
+            if (removed == 0)
+            {
+                return 0;
+            }
+
+            // 先写盘成功再改内存：写盘失败时磁盘仍是真相，内存跟着它（否则首页会少算）。
+            try
+            {
+                var content = string.Concat(
+                    kept.Select(row => JsonSerializer.Serialize(row.Entry, SerializerOptions) + "\n"));
+
+                AtomicFile.WriteAllText(_historyFilePath, content);
+            }
+            catch (Exception exception)
+                when (exception is IOException or UnauthorizedAccessException or NotSupportedException)
+            {
+                _logger.Warning(exception, "清理导出历史写盘失败，本次未删除任何记录：{HistoryFilePath}", _historyFilePath);
+                return 0;
+            }
+
+            _entries.Clear();
+            _entries.AddRange(kept);
+
+            _logger.Information(
+                "导出历史已按时间清理：删除 {RemovedCount} 条、保留 {KeptCount} 条",
+                removed,
+                kept.Count);
+
+            return removed;
         }
     }
 

@@ -26,4 +26,11 @@ internal sealed class StubSettingsService : ISettingsService
     public void AddRecentRepository(string repositoryPath)
     {
     }
+
+    /// <summary>桩没有磁盘可重载：把内存里的设置换回默认值，即「重新读到一份默认设置」。</summary>
+    public void Reload()
+    {
+        Settings = new GlobalSettings();
+        RecentRepositories = [];
+    }
 }

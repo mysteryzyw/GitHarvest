@@ -14,14 +14,23 @@ public static class LoggingSetup
     public const string LogFileNameTemplate = "log-.txt";
 
     /// <summary>
+    /// 日志文件的通配模式：清理时按它枚举（见 <see cref="DataMaintenanceService"/>）。
+    /// 与 <see cref="LogFileNameTemplate"/> 是一对——改了模板忘了改这里，清理就会漏掉文件。
+    /// </summary>
+    public const string LogFileSearchPattern = "log-*.txt";
+
+    /// <summary>
     /// 保留的日志文件数量。Serilog 的保留策略按文件个数计，配合按天滚动即「保留最近 30 天」。
+    /// 这是**兜底**：用户可在全局设置里配「数据保留天数」，由
+    /// <see cref="DataMaintenanceService.PruneExpired"/> 按天数真正执行清理；
+    /// 两者不冲突（个数上限大、天数上限小，天数先生效）。
     /// </summary>
     public const int RetainedFileCountLimit = 30;
 
     /// <summary>
     /// 建立写入指定日志目录的文件日志器。目录不存在时自动创建。
     /// </summary>
-    /// <param name="logDirectory">日志目录，通常取自 <see cref="AppPaths.GetLogDirectory()"/>。</param>
+    /// <param name="logDirectory">日志目录，取自 <see cref="IDataLocation.LogDirectory"/>。</param>
     public static Logger ConfigureFileLogging(string logDirectory)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(logDirectory);
