@@ -32,14 +32,14 @@
           （该附加属性沿视觉树继承，设一次即覆盖整个窗口）。
     -->
 
-    <Grid Background="{StaticResource AppWindowBackgroundBrush}">
+    <Grid Background="{DynamicResource AppWindowBackgroundBrush}">
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto" />
             <RowDefinition Height="*" />
         </Grid.RowDefinitions>
 
         <!-- 标题栏底色：原型在 Mica 上叠 35% 白，让标题栏比内容区更亮一层 -->
-        <Rectangle Grid.Row="0" Fill="{StaticResource AppTitleBarBackgroundBrush}" IsHitTestVisible="False" />
+        <Rectangle Grid.Row="0" Fill="{DynamicResource AppTitleBarBackgroundBrush}" IsHitTestVisible="False" />
 
         <ui:TitleBar
             Grid.Row="0"
@@ -64,14 +64,14 @@
             <Rectangle
                 Width="256"
                 HorizontalAlignment="Left"
-                Fill="{StaticResource AppNavPaneBackgroundBrush}" />
+                Fill="{DynamicResource AppNavPaneBackgroundBrush}" />
 
             <Rectangle
                 Width="256"
                 Height="1"
                 HorizontalAlignment="Left"
                 VerticalAlignment="Top"
-                Fill="{StaticResource AppStrokeBrush}" />
+                Fill="{DynamicResource AppStrokeBrush}" />
         </Grid>
 
         <ui:NavigationView

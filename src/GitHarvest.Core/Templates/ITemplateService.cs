@@ -17,6 +17,15 @@ public interface ITemplateService
     Task<TemplateLoadResult> LoadTemplateAsync(CancellationToken cancellationToken = default);
 
     /// <summary>
+    /// 判断给定的自定义模板路径当前是否可用（非空且文件存在）。设置页用它决定
+    /// 「打开模板文件」按钮的可用性：路径填了但文件已不在时按钮置灰并提示当前走内置模板，
+    /// 而不是等用户点了才报「找不到文件」。
+    /// </summary>
+    /// <param name="templatePath">要检查的模板文件路径（可为空串）。</param>
+    /// <returns>路径非空且文件存在时为真。</returns>
+    bool IsTemplateFileAvailable(string templatePath);
+
+    /// <summary>
     /// 渲染一段含占位符的文本：12 个已知占位符替换为当前范围的值；
     /// 未知占位符原样保留并各记一条警告（按占位符名去重，用户故事 39）。
     /// 编辑器的实时预览与最终写出更新说明走同一个渲染入口，所见即所得。

@@ -4,14 +4,15 @@
 
     <!--
         设计令牌取自 docs/prototype/ui-fluent/index.html 的 Fluent 调色板。
-        表面与文字颜色优先走 WpfUI 主题画刷（随深浅主题切换），
-        这里固定原型中不随主题变化、或 WpfUI 未提供的值：强调色、卡片描边与投影、
-        导航项尺寸、浮起操作条、以及窗口底色的三处径向渐变。
+        本文件只放**不随主题变化**的令牌：强调色、字体、圆角、投影，以及对 WpfUI 默认外观的覆盖。
+        随主题变化的令牌（状态色、类型五色、卡片与导航的底色与描边、窗口底色、步骤条）在
+        Tokens.Light.xaml / Tokens.Dark.xaml 两档里，由 ThemeService 在切换主题时整体替换——
+        那些键在 XAML 中必须用 `{DynamicResource}` 引用，静态引用会把值钉死在加载时刻。
         数值后标注的注释即原型 CSS 中的对应声明。
     -->
 
     <!-- ==================== 强调色 ==================== -->
-    <!-- 原型 :root 的 accent / accent-hover / accent-pressed 三个 CSS 变量 -->
+    <!-- 原型 :root 的 accent / accent-hover / accent-pressed 三个 CSS 变量（深浅主题同值） -->
     <Color x:Key="AppAccentColor">#FF0067C0</Color>
     <Color x:Key="AppAccentHoverColor">#FF005FB8</Color>
     <Color x:Key="AppAccentPressedColor">#FF004A8E</Color>
@@ -19,75 +20,24 @@
     <SolidColorBrush x:Key="AppAccentBrush" Color="{StaticResource AppAccentColor}" />
     <SolidColorBrush x:Key="AppAccentHoverBrush" Color="{StaticResource AppAccentHoverColor}" />
     <SolidColorBrush x:Key="AppAccentPressedBrush" Color="{StaticResource AppAccentPressedColor}" />
+    <!-- 10% / 25% 强调色覆盖：作为半透明色叠在任意主题的底上都能成形，两档同值 -->
     <SolidColorBrush x:Key="AppAccentSoftBrush" Color="#1A0067C0" />
     <SolidColorBrush x:Key="AppAccentBorderBrush" Color="#400067C0" />
     <SolidColorBrush x:Key="AppOnAccentBrush" Color="#FFFFFFFF" />
 
-    <!-- ==================== 状态色 ==================== -->
-    <SolidColorBrush x:Key="AppSuccessBrush" Color="#FF107C10" />
-    <SolidColorBrush x:Key="AppSuccessSoftBrush" Color="#FFDFF6DD" />
-
     <!--
-        错误提示横幅：原型 .banner.err 用的就是 :root 里的 err 与 err-bg 两个变量，
-        描边是 rgba(196,43,28,.25)，正文色是比 err 更深的 #8C1D13（浅底上够对比度）。
+        提示横幅的半透明描边（25% 状态色）：与上面同理，叠在两种底上都能读出来，不随主题分档。
+        横幅的底色与正文色在 Tokens.Light/Dark.xaml 里。成功/危险/警告三支各留一个，
+        与「状态色三支对称」的口径一致——只有危险与警告有令牌、成功那支写死，改色时会漏掉一处。
     -->
-    <SolidColorBrush x:Key="AppDangerBrush" Color="#FFC42B1C" />
-    <SolidColorBrush x:Key="AppDangerSoftBrush" Color="#FFFDE7E9" />
+    <SolidColorBrush x:Key="AppSuccessBorderBrush" Color="#40107C10" />
     <SolidColorBrush x:Key="AppDangerBorderBrush" Color="#40C42B1C" />
-    <SolidColorBrush x:Key="AppDangerTextBrush" Color="#FF8C1D13" />
-
-    <!--
-        警告提示横幅：原型 :root 的 warn 与 warn-bg（.banner 只有 ok/err 两种，
-        warn 色取自类型徽章所在的同一套状态色；正文用更深的 #7F3D0E 保证浅黄底上的对比度）。
-    -->
-    <SolidColorBrush x:Key="AppWarnBrush" Color="#FFCA5010" />
-    <SolidColorBrush x:Key="AppWarnSoftBrush" Color="#FFFFF4CE" />
     <SolidColorBrush x:Key="AppWarnBorderBrush" Color="#40CA5010" />
-    <SolidColorBrush x:Key="AppWarnTextBrush" Color="#FF7F3D0E" />
 
-    <!-- ==================== 变更类型五色（原型 :root 的 c-add / c-del / c-mod / c-ren / c-oth） ==================== -->
-    <!--
-        导出前总预览页的五类变更：类型徽章（.pill）、分组计数徽章（.g-badge）、
-        统计卡（.stat-card 的色块与数字）共用「主色 + 浅底色」一对。
-        新增 / 删除两对与状态色（ok / err）取值相同，但语义独立各留一份，
-        避免将来状态色调整时把类型徽章一起带偏。
-    -->
-    <SolidColorBrush x:Key="AppTypeAddBrush" Color="#FF107C10" />
-    <SolidColorBrush x:Key="AppTypeAddSoftBrush" Color="#FFDFF6DD" />
-    <SolidColorBrush x:Key="AppTypeDeleteBrush" Color="#FFC42B1C" />
-    <SolidColorBrush x:Key="AppTypeDeleteSoftBrush" Color="#FFFDE7E9" />
-    <SolidColorBrush x:Key="AppTypeModifyBrush" Color="#FF0067C0" />
-    <SolidColorBrush x:Key="AppTypeModifySoftBrush" Color="#FFE8F1FB" />
-    <SolidColorBrush x:Key="AppTypeRenameBrush" Color="#FF7A3FBF" />
-    <SolidColorBrush x:Key="AppTypeRenameSoftBrush" Color="#FFF1E9FB" />
-    <SolidColorBrush x:Key="AppTypeOtherBrush" Color="#FF5D5D5D" />
-    <SolidColorBrush x:Key="AppTypeOtherSoftBrush" Color="#FFF0F0F0" />
-
-    <!-- ==================== 中性色 ==================== -->
-    <SolidColorBrush x:Key="AppStrokeBrush" Color="#0F000000" />
-    <SolidColorBrush x:Key="AppStrokeStrongBrush" Color="#72000000" />
-    <SolidColorBrush x:Key="AppSurfaceBrush" Color="#CCFDFDFD" />
-    <SolidColorBrush x:Key="AppSurfaceMutedBrush" Color="#1F000000" />
-
-    <!-- ==================== 卡片（原型 .card） ==================== -->
-    <!--
-        原型卡片底色是 rgba(253,253,253,.78)，叠在页面底（243）上合成约 #FBFBFB。
-        WPF 里不能照抄这个半透明值：卡片的 DropShadowEffect 画在元素背后，
-        半透明卡面会把自家投影透出来，把卡面压暗约 5 级（实机采样 246 vs 原型 251，
-        即 0.78×253 + 0.22×(9% 黑影叠在 244 上的 222) = 246）。
-        因此这里直接给等效的不透明合成色，卡面亮度与原型一致，投影也回到只出现在卡片外。
-    -->
-    <SolidColorBrush x:Key="AppCardBackgroundBrush" Color="#FFFBFBFB" />
-    <!--
-        嵌套在卡片里的卡（概览统计小卡、后续页面的分块）：原型是「卡底再叠一层 78% 白」≈ 253，
-        所以比基卡再亮两级，两者靠 1px 描边区分（与原型观感一致）。
-    -->
-    <SolidColorBrush x:Key="AppRaisedCardBackgroundBrush" Color="#FFFDFDFD" />
-    <!-- 原型 .card 的 card-border: rgba(0,0,0,.0578) -->
-    <SolidColorBrush x:Key="AppCardBorderBrush" Color="#0F000000" />
     <!--
         原型 .card 的 card-shadow: 0 2px 4px rgba(0,0,0,.04), 0 0 2px rgba(0,0,0,.06)。
         WPF 的 DropShadowEffect 只支持单层投影，这里用「小位移 + 中模糊」近似两层叠加的观感。
+        深色主题下投影本就几乎不可见（Fluent 深色也不用投影分层），两档同值。
     -->
     <DropShadowEffect
         x:Key="AppCardShadowEffect"
@@ -110,10 +60,7 @@
         Opacity="0.15"
         ShadowDepth="5" />
 
-    <!-- ==================== 浮起操作条（原型 .range-bar） ==================== -->
-    <!-- 原型 background: rgba(252,252,252,.92)：同样给等效不透明色（半透明会让自身投影透上来压暗条面） -->
-    <SolidColorBrush x:Key="AppBarBackgroundBrush" Color="#FFFCFCFC" />
-    <!-- 原型 box-shadow: 0 8px 24px rgba(0,0,0,.10) -->
+    <!-- 原型 .range-bar 的 box-shadow: 0 8px 24px rgba(0,0,0,.10) -->
     <DropShadowEffect
         x:Key="AppBarShadowEffect"
         BlurRadius="24"
@@ -122,30 +69,26 @@
         Opacity="0.14"
         ShadowDepth="4" />
 
-    <!-- ==================== 导航项（原型 .nav-item） ==================== -->
-    <!-- 原型 hover: rgba(0,0,0,.045) -->
-    <SolidColorBrush x:Key="AppNavItemHoverBrush" Color="#0B000000" />
-    <!-- 原型 active: 白色卡片 + 卡片描边 + 卡片投影 -->
-    <SolidColorBrush x:Key="AppNavItemActiveBrush" Color="#FFFCFCFC" />
-    <!-- 原型导航区的白底：background: rgba(255,255,255,.30) -->
-    <SolidColorBrush x:Key="AppNavPaneBackgroundBrush" Color="#4DFFFFFF" />
-    <!-- 原型标题栏的白底：background: rgba(255,255,255,.35) -->
-    <SolidColorBrush x:Key="AppTitleBarBackgroundBrush" Color="#59FFFFFF" />
+    <!-- 原型 .seg button.on 的 box-shadow: 0 1px 3px rgba(0,0,0,.12)（分段控件的选中项） -->
+    <DropShadowEffect
+        x:Key="AppSegShadowEffect"
+        BlurRadius="3"
+        Color="#FF000000"
+        Direction="270"
+        Opacity="0.12"
+        ShadowDepth="1" />
+
     <!--
         导航项尺寸取自原型 .nav-item：13.5px 字号、17px 图标、12px 图文间距，
         min-height 由「9px 内边距 ×2 + 17px 图标 + 1px 描边 ×2」得出。
     -->
 
-    <!-- ==================== 窗口底色（原型 body 的三处径向渐变） ==================== -->
+    <!-- ==================== 窗口底色的染色层 ==================== -->
     <!--
-        原型 .window 的底色 rgba(243,243,243,.86)：86% 不透明的中性灰盖在 Mica 之上。
-        少了这一层，Mica 会把桌面壁纸的颜色透进内容区（实机会偏壁纸色，与原型不符）；
-        保留 14% 透明让 Mica 仍有轻微活性。三处径向渐变与导航区白底都铺在这层灰之上。
-    -->
-    <SolidColorBrush x:Key="AppWindowBackgroundBrush" Color="#DBF3F3F3" />
-    <!--
-        原型用三个 radial-gradient 给底色加极淡的蓝 / 紫 / 绿染色，半径与位置按 1280×840 的窗口换算。
+        原型用三个 radial-gradient 给底色加极淡的蓝 / 紫 / 绿染色（7% 上下），半径与位置按 1280×840 换算。
         单独放在窗口底层铺满，内容区与导航区都是透明背景，因此这层会从两侧透出。
+        7% 色洗在深浅两种底上都读作同一层极淡的辉光，两档同值——
+        换成深色专用值收益很小，却会让「窗口底」变成两处维护。
     -->
     <RadialGradientBrush
         x:Key="AppBackgroundTintBlueBrush"
@@ -182,12 +125,6 @@
         <GradientStop Offset="0.6" Color="#00107C10" />
         <GradientStop Offset="1" Color="#00107C10" />
     </RadialGradientBrush>
-
-    <!-- ==================== 步骤指示条（原型 .stepbar / .step） ==================== -->
-    <!-- 原型 .step .n 未到达态背景 #E4E4E4 -->
-    <SolidColorBrush x:Key="AppStepBadgeBrush" Color="#FFE4E4E4" />
-    <!-- 原型 .step .line 连接线 #D6D6D6 -->
-    <SolidColorBrush x:Key="AppStepLineBrush" Color="#FFD6D6D6" />
 
     <!-- ==================== 字体 ==================== -->
     <FontFamily x:Key="AppFontFamily">Segoe UI Variable Text, Segoe UI, Microsoft YaHei UI, Microsoft YaHei</FontFamily>

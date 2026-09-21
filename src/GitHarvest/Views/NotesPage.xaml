@@ -107,7 +107,7 @@
                             Margin="0,0,10,0"
                             VerticalAlignment="Top"
                             FontSize="16"
-                            Foreground="{StaticResource AppWarnTextBrush}"
+                            Foreground="{DynamicResource AppWarnTextBrush}"
                             Symbol="Warning24" />
                         <TextBlock Grid.Column="1" Style="{StaticResource AppWarningText}" Text="输出路径位于当前仓库的工作区内，更新包会出现在 git status 里；可以继续导出，同一会话内不再提示。" />
                         <StackPanel
@@ -145,7 +145,7 @@
                             <ui:SymbolIcon
                                 VerticalAlignment="Center"
                                 FontSize="16"
-                                Foreground="{StaticResource AppDangerBrush}"
+                                Foreground="{DynamicResource AppDangerBrush}"
                                 Symbol="ErrorCircle24" />
                             <TextBlock
                                 Margin="8,0,0,0"
@@ -163,7 +163,7 @@
                                     <Border
                                         Margin="0,0,0,6"
                                         Padding="12,9"
-                                        Background="{StaticResource AppDangerSoftBrush}"
+                                        Background="{DynamicResource AppDangerSoftBrush}"
                                         CornerRadius="6">
                                         <TextBlock Style="{StaticResource AppBannerText}" Text="{Binding Description}" />
                                     </Border>
@@ -203,10 +203,10 @@
                                     <Setter Property="Background" Value="{StaticResource AppAccentSoftBrush}" />
                                     <Style.Triggers>
                                         <DataTrigger Binding="{Binding StatusKind}" Value="Success">
-                                            <Setter Property="Background" Value="{StaticResource AppSuccessSoftBrush}" />
+                                            <Setter Property="Background" Value="{DynamicResource AppSuccessSoftBrush}" />
                                         </DataTrigger>
                                         <DataTrigger Binding="{Binding StatusKind}" Value="Error">
-                                            <Setter Property="Background" Value="{StaticResource AppDangerSoftBrush}" />
+                                            <Setter Property="Background" Value="{DynamicResource AppDangerSoftBrush}" />
                                         </DataTrigger>
                                     </Style.Triggers>
                                 </Style>
@@ -217,10 +217,10 @@
                                         <Setter Property="Foreground" Value="{StaticResource AppAccentBrush}" />
                                         <Style.Triggers>
                                             <DataTrigger Binding="{Binding StatusKind}" Value="Success">
-                                                <Setter Property="Foreground" Value="{StaticResource AppSuccessBrush}" />
+                                                <Setter Property="Foreground" Value="{DynamicResource AppSuccessBrush}" />
                                             </DataTrigger>
                                             <DataTrigger Binding="{Binding StatusKind}" Value="Error">
-                                                <Setter Property="Foreground" Value="{StaticResource AppDangerBrush}" />
+                                                <Setter Property="Foreground" Value="{DynamicResource AppDangerBrush}" />
                                             </DataTrigger>
                                         </Style.Triggers>
                                     </Style>
@@ -247,7 +247,7 @@
                                 <ProgressBar.Style>
                                     <Style TargetType="ProgressBar">
                                         <Setter Property="Visibility" Value="Collapsed" />
-                                        <Setter Property="Background" Value="{StaticResource AppSurfaceMutedBrush}" />
+                                        <Setter Property="Background" Value="{DynamicResource AppSurfaceMutedBrush}" />
                                         <Setter Property="Foreground" Value="{StaticResource AppAccentBrush}" />
                                         <Setter Property="BorderThickness" Value="0" />
                                         <Setter Property="Template">
@@ -284,10 +284,10 @@
                                         <Setter Property="Foreground" Value="{StaticResource AppAccentBrush}" />
                                         <Style.Triggers>
                                             <DataTrigger Binding="{Binding StatusKind}" Value="Success">
-                                                <Setter Property="Foreground" Value="{StaticResource AppSuccessBrush}" />
+                                                <Setter Property="Foreground" Value="{DynamicResource AppSuccessBrush}" />
                                             </DataTrigger>
                                             <DataTrigger Binding="{Binding StatusKind}" Value="Error">
-                                                <Setter Property="Foreground" Value="{StaticResource AppDangerBrush}" />
+                                                <Setter Property="Foreground" Value="{DynamicResource AppDangerBrush}" />
                                             </DataTrigger>
                                         </Style.Triggers>
                                     </Style>
@@ -403,7 +403,7 @@
                             Margin="0,0,10,0"
                             VerticalAlignment="Top"
                             FontSize="16"
-                            Foreground="{StaticResource AppWarnTextBrush}"
+                            Foreground="{DynamicResource AppWarnTextBrush}"
                             Symbol="Warning24" />
                         <TextBlock Style="{StaticResource AppWarningText}" Text="{Binding TemplateNotice}" />
                     </StackPanel>
@@ -426,7 +426,7 @@
                             Margin="0,0,10,0"
                             VerticalAlignment="Top"
                             FontSize="16"
-                            Foreground="{StaticResource AppWarnTextBrush}"
+                            Foreground="{DynamicResource AppWarnTextBrush}"
                             Symbol="Warning24" />
                         <TextBlock Style="{StaticResource AppWarningText}" Text="{Binding PlaceholderWarning}" />
                     </StackPanel>
@@ -458,8 +458,8 @@
                         <Border
                             Grid.Row="0"
                             Padding="14,10"
-                            Background="{StaticResource AppSurfaceBrush}"
-                            BorderBrush="{StaticResource AppStrokeBrush}"
+                            Background="{DynamicResource AppSurfaceBrush}"
+                            BorderBrush="{DynamicResource AppStrokeBrush}"
                             BorderThickness="0,0,0,1"
                             CornerRadius="8,8,0,0">
                             <Grid>
@@ -569,7 +569,7 @@
                                 <Border
                                     Grid.Row="0"
                                     Padding="16,9"
-                                    BorderBrush="{StaticResource AppStrokeBrush}"
+                                    BorderBrush="{DynamicResource AppStrokeBrush}"
                                     BorderThickness="0,0,0,1">
                                     <TextBlock
                                         FontSize="11.5"
@@ -602,7 +602,7 @@
 
                             <Border
                                 Grid.Column="1"
-                                BorderBrush="{StaticResource AppStrokeBrush}"
+                                BorderBrush="{DynamicResource AppStrokeBrush}"
                                 BorderThickness="1,0,0,0">
                                 <Grid>
                                     <Grid.RowDefinitions>
@@ -612,7 +612,7 @@
                                     <Border
                                         Grid.Row="0"
                                         Padding="16,9"
-                                        BorderBrush="{StaticResource AppStrokeBrush}"
+                                        BorderBrush="{DynamicResource AppStrokeBrush}"
                                         BorderThickness="0,0,0,1">
                                         <TextBlock
                                             FontSize="11.5"
@@ -656,13 +656,13 @@
                             Width="40"
                             Height="40"
                             VerticalAlignment="Center"
-                            Background="{StaticResource AppSuccessSoftBrush}"
+                            Background="{DynamicResource AppSuccessSoftBrush}"
                             CornerRadius="20">
                             <ui:SymbolIcon
                                 HorizontalAlignment="Center"
                                 VerticalAlignment="Center"
                                 FontSize="18"
-                                Foreground="{StaticResource AppSuccessBrush}"
+                                Foreground="{DynamicResource AppSuccessBrush}"
                                 Symbol="Checkmark24" />
                         </Border>
                         <StackPanel Margin="12,0,0,0" VerticalAlignment="Center">
@@ -739,7 +739,7 @@
                                 Margin="8,0,0,0"
                                 VerticalAlignment="Center"
                                 FontSize="12"
-                                Foreground="{StaticResource AppDangerBrush}"
+                                Foreground="{DynamicResource AppDangerBrush}"
                                 Text="{Binding DataContext.FolderNameError, RelativeSource={RelativeSource AncestorType=Page}}" />
                         </StackPanel>
                         <TextBlock

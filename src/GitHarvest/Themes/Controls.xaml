@@ -70,8 +70,8 @@
         因此这里用 Border 直接描述卡片外观；需要悬浮反馈的卡片再叠加 hoverable 触发器。
     -->
     <Style x:Key="AppCard" TargetType="Border">
-        <Setter Property="Background" Value="{StaticResource AppCardBackgroundBrush}" />
-        <Setter Property="BorderBrush" Value="{StaticResource AppCardBorderBrush}" />
+        <Setter Property="Background" Value="{DynamicResource AppCardBackgroundBrush}" />
+        <Setter Property="BorderBrush" Value="{DynamicResource AppCardBorderBrush}" />
         <Setter Property="BorderThickness" Value="1" />
         <Setter Property="CornerRadius" Value="{StaticResource CardCornerRadius}" />
         <Setter Property="Effect" Value="{StaticResource AppCardShadowEffect}" />
@@ -138,11 +138,11 @@
                     </Border>
                     <ControlTemplate.Triggers>
                         <Trigger Property="IsMouseOver" Value="True">
-                            <Setter TargetName="Chrome" Property="Background" Value="#0D000000" />
+                            <Setter TargetName="Chrome" Property="Background" Value="{DynamicResource AppGhostHoverBrush}" />
                             <Setter Property="Foreground" Value="{DynamicResource TextFillColorPrimaryBrush}" />
                         </Trigger>
                         <Trigger Property="IsPressed" Value="True">
-                            <Setter TargetName="Chrome" Property="Background" Value="#14000000" />
+                            <Setter TargetName="Chrome" Property="Background" Value="{DynamicResource AppGhostPressedBrush}" />
                         </Trigger>
                     </ControlTemplate.Triggers>
                 </ControlTemplate>
@@ -153,8 +153,8 @@
     <!-- ==================== 浮起操作条（原型 .range-bar） ==================== -->
     <!-- 原型：padding 13px 18px / 圆角 10 / 1px 描边 / 0 8px 24px 投影 -->
     <Style x:Key="AppActionBar" TargetType="Border">
-        <Setter Property="Background" Value="{StaticResource AppBarBackgroundBrush}" />
-        <Setter Property="BorderBrush" Value="{StaticResource AppCardBorderBrush}" />
+        <Setter Property="Background" Value="{DynamicResource AppBarBackgroundBrush}" />
+        <Setter Property="BorderBrush" Value="{DynamicResource AppCardBorderBrush}" />
         <Setter Property="BorderThickness" Value="1" />
         <Setter Property="CornerRadius" Value="10" />
         <Setter Property="Padding" Value="18,13" />
@@ -174,7 +174,7 @@
         横幅显示与否由使用它的页面用 DataTrigger 决定（可见性属于页面语义，不在样式里）。
     -->
     <Style x:Key="AppErrorBanner" TargetType="Border">
-        <Setter Property="Background" Value="{StaticResource AppDangerSoftBrush}" />
+        <Setter Property="Background" Value="{DynamicResource AppDangerSoftBrush}" />
         <Setter Property="BorderBrush" Value="{StaticResource AppDangerBorderBrush}" />
         <Setter Property="BorderThickness" Value="1" />
         <Setter Property="CornerRadius" Value="8" />
@@ -187,7 +187,7 @@
         <Setter Property="FontFamily" Value="{StaticResource AppFontFamily}" />
         <Setter Property="FontSize" Value="13" />
         <Setter Property="LineHeight" Value="19" />
-        <Setter Property="Foreground" Value="{StaticResource AppDangerTextBrush}" />
+        <Setter Property="Foreground" Value="{DynamicResource AppDangerTextBrush}" />
         <Setter Property="TextWrapping" Value="Wrap" />
         <Setter Property="VerticalAlignment" Value="Center" />
     </Style>
@@ -233,8 +233,8 @@
     <!-- 原型 .chip：高 24px、左右内边距 10、圆角 12；文字垂直居中交给 AppMonoChipText -->
     <Style x:Key="AppMonoChip" TargetType="Border">
         <Setter Property="Height" Value="24" />
-        <Setter Property="Background" Value="#FFEFEFEF" />
-        <Setter Property="BorderBrush" Value="{StaticResource AppStrokeBrush}" />
+        <Setter Property="Background" Value="{DynamicResource AppChipBackgroundBrush}" />
+        <Setter Property="BorderBrush" Value="{DynamicResource AppStrokeBrush}" />
         <Setter Property="BorderThickness" Value="1" />
         <Setter Property="CornerRadius" Value="12" />
         <Setter Property="Padding" Value="10,0" />
@@ -271,7 +271,7 @@
 
     <!-- 警告横幅（与 AppErrorBanner 同构：11px 14px 内边距、8px 圆角、warn 底 + 25% 描边） -->
     <Style x:Key="AppWarningBanner" TargetType="Border">
-        <Setter Property="Background" Value="{StaticResource AppWarnSoftBrush}" />
+        <Setter Property="Background" Value="{DynamicResource AppWarnSoftBrush}" />
         <Setter Property="BorderBrush" Value="{StaticResource AppWarnBorderBrush}" />
         <Setter Property="BorderThickness" Value="1" />
         <Setter Property="CornerRadius" Value="8" />
@@ -283,7 +283,7 @@
         <Setter Property="FontFamily" Value="{StaticResource AppFontFamily}" />
         <Setter Property="FontSize" Value="13" />
         <Setter Property="LineHeight" Value="19" />
-        <Setter Property="Foreground" Value="{StaticResource AppWarnTextBrush}" />
+        <Setter Property="Foreground" Value="{DynamicResource AppWarnTextBrush}" />
         <Setter Property="TextWrapping" Value="Wrap" />
         <Setter Property="VerticalAlignment" Value="Center" />
     </Style>
@@ -303,7 +303,7 @@
         </Setter>
         <Style.Triggers>
             <Trigger Property="IsMouseOver" Value="True">
-                <Setter Property="BorderBrush" Value="#400067C0" />
+                <Setter Property="BorderBrush" Value="{StaticResource AppAccentBorderBrush}" />
                 <Setter Property="Effect" Value="{StaticResource AppCardHoverShadowEffect}" />
                 <Trigger.EnterActions>
                     <BeginStoryboard>
@@ -331,8 +331,8 @@
 
     <!-- 成功横幅（与 AppErrorBanner 同构：ok 底 + 25% ok 描边，原型 .banner.ok） -->
     <Style x:Key="AppSuccessBanner" TargetType="Border">
-        <Setter Property="Background" Value="{StaticResource AppSuccessSoftBrush}" />
-        <Setter Property="BorderBrush" Value="#40107C10" />
+        <Setter Property="Background" Value="{DynamicResource AppSuccessSoftBrush}" />
+        <Setter Property="BorderBrush" Value="{StaticResource AppSuccessBorderBrush}" />
         <Setter Property="BorderThickness" Value="1" />
         <Setter Property="CornerRadius" Value="8" />
         <Setter Property="Padding" Value="14,11" />
@@ -343,7 +343,7 @@
         <Setter Property="FontFamily" Value="{StaticResource AppFontFamily}" />
         <Setter Property="FontSize" Value="13" />
         <Setter Property="LineHeight" Value="19" />
-        <Setter Property="Foreground" Value="#FF0B5D0B" />
+        <Setter Property="Foreground" Value="{DynamicResource AppSuccessTextBrush}" />
         <Setter Property="TextWrapping" Value="Wrap" />
         <Setter Property="VerticalAlignment" Value="Center" />
     </Style>
@@ -385,10 +385,10 @@
                     </Border>
                     <ControlTemplate.Triggers>
                         <Trigger Property="IsMouseOver" Value="True">
-                            <Setter TargetName="Chrome" Property="Background" Value="#FFFFFFFF" />
+                            <Setter TargetName="Chrome" Property="Background" Value="{DynamicResource AppTabSelectedBrush}" />
                         </Trigger>
                         <Trigger Property="IsChecked" Value="True">
-                            <Setter TargetName="Chrome" Property="Background" Value="#FFFFFFFF" />
+                            <Setter TargetName="Chrome" Property="Background" Value="{DynamicResource AppTabSelectedBrush}" />
                         </Trigger>
                         <Trigger Property="IsEnabled" Value="False">
                             <Setter TargetName="Chrome" Property="Opacity" Value="0.5" />
@@ -405,8 +405,8 @@
         投影复用浮起操作条的 AppBarShadowEffect（同为「浮在页面上方」语义）。
     -->
     <Style x:Key="AppComboMenu" TargetType="Border">
-        <Setter Property="Background" Value="{StaticResource AppRaisedCardBackgroundBrush}" />
-        <Setter Property="BorderBrush" Value="{StaticResource AppCardBorderBrush}" />
+        <Setter Property="Background" Value="{DynamicResource AppRaisedCardBackgroundBrush}" />
+        <Setter Property="BorderBrush" Value="{DynamicResource AppCardBorderBrush}" />
         <Setter Property="BorderThickness" Value="1" />
         <Setter Property="CornerRadius" Value="{StaticResource CardCornerRadius}" />
         <Setter Property="Padding" Value="6" />
@@ -460,7 +460,7 @@
         这里只保留分隔线与内边距（内边距给内容侧的 Grid，Border 自身负责画线）。
     -->
     <Style x:Key="AppPickHead" TargetType="Border">
-        <Setter Property="BorderBrush" Value="{StaticResource AppCardBorderBrush}" />
+        <Setter Property="BorderBrush" Value="{DynamicResource AppCardBorderBrush}" />
         <Setter Property="BorderThickness" Value="0,0,0,1" />
         <Setter Property="SnapsToDevicePixels" Value="True" />
     </Style>
@@ -471,7 +471,7 @@
         <Setter Property="SnapsToDevicePixels" Value="True" />
         <Style.Triggers>
             <DataTrigger Binding="{Binding RoleKind}" Value="Base">
-                <Setter Property="Background" Value="#FF5D5D5D" />
+                <Setter Property="Background" Value="{DynamicResource AppNeutralBadgeBrush}" />
             </DataTrigger>
         </Style.Triggers>
     </Style>
@@ -511,7 +511,7 @@
                     </Border>
                     <ControlTemplate.Triggers>
                         <Trigger Property="IsMouseOver" Value="True">
-                            <Setter TargetName="Chrome" Property="Background" Value="#0A000000" />
+                            <Setter TargetName="Chrome" Property="Background" Value="{DynamicResource AppHoverOverlayBrush}" />
                         </Trigger>
                         <Trigger Property="IsSelected" Value="True">
                             <Setter TargetName="Chrome" Property="Background" Value="{StaticResource AppAccentSoftBrush}" />
@@ -563,7 +563,7 @@
 
     <!-- 短哈希徽章（原型 .commit .hash：mono 11px、#EFEFEF 底、1px 控件描边、圆角 4；选中转强调色实底白字） -->
     <Style x:Key="AppCommitHashChip" TargetType="Border">
-        <Setter Property="Background" Value="#FFEFEFEF" />
+        <Setter Property="Background" Value="{DynamicResource AppChipBackgroundBrush}" />
         <Setter Property="BorderBrush" Value="{DynamicResource ControlStrokeColorDefaultBrush}" />
         <Setter Property="BorderThickness" Value="1" />
         <Setter Property="CornerRadius" Value="{StaticResource ControlCornerRadius}" />
@@ -610,8 +610,8 @@
                 <ControlTemplate TargetType="ToggleButton">
                     <Border
                         x:Name="Chrome"
-                        Background="{StaticResource AppCardBackgroundBrush}"
-                        BorderBrush="{StaticResource AppCardBorderBrush}"
+                        Background="{DynamicResource AppCardBackgroundBrush}"
+                        BorderBrush="{DynamicResource AppCardBorderBrush}"
                         BorderThickness="1"
                         CornerRadius="{StaticResource CardCornerRadius}"
                         Effect="{StaticResource AppCardShadowEffect}"
@@ -655,7 +655,7 @@
                     </Border>
                     <ControlTemplate.Triggers>
                         <Trigger Property="IsMouseOver" Value="True">
-                            <Setter TargetName="Chrome" Property="BorderBrush" Value="#33000000" />
+                            <Setter TargetName="Chrome" Property="BorderBrush" Value="{DynamicResource AppHoverBorderBrush}" />
                         </Trigger>
                         <Trigger Property="IsChecked" Value="True">
                             <Setter TargetName="Chrome" Property="Background" Value="{StaticResource AppAccentBrush}" />
@@ -703,14 +703,14 @@
                 <ControlTemplate TargetType="ToggleButton">
                     <Border
                         x:Name="Chrome"
-                        Background="#73FFFFFF"
+                        Background="{DynamicResource AppGroupHeadBrush}"
                         Padding="12,12,16,12"
                         SnapsToDevicePixels="True">
                         <ContentPresenter />
                     </Border>
                     <ControlTemplate.Triggers>
                         <Trigger Property="IsMouseOver" Value="True">
-                            <Setter TargetName="Chrome" Property="Background" Value="#BFFFFFFF" />
+                            <Setter TargetName="Chrome" Property="Background" Value="{DynamicResource AppGroupHeadHoverBrush}" />
                         </Trigger>
                     </ControlTemplate.Triggers>
                 </ControlTemplate>
@@ -748,39 +748,39 @@
         <Setter Property="Height" Value="20" />
         <Setter Property="CornerRadius" Value="10" />
         <Setter Property="Padding" Value="7,0" />
-        <Setter Property="Background" Value="{StaticResource AppTypeAddSoftBrush}" />
+        <Setter Property="Background" Value="{DynamicResource AppTypeAddSoftBrush}" />
         <Setter Property="SnapsToDevicePixels" Value="True" />
         <Style.Triggers>
             <DataTrigger Binding="{Binding Kind}" Value="Deleted">
-                <Setter Property="Background" Value="{StaticResource AppTypeDeleteSoftBrush}" />
+                <Setter Property="Background" Value="{DynamicResource AppTypeDeleteSoftBrush}" />
             </DataTrigger>
             <DataTrigger Binding="{Binding Kind}" Value="Modified">
-                <Setter Property="Background" Value="{StaticResource AppTypeModifySoftBrush}" />
+                <Setter Property="Background" Value="{DynamicResource AppTypeModifySoftBrush}" />
             </DataTrigger>
             <DataTrigger Binding="{Binding Kind}" Value="Renamed">
-                <Setter Property="Background" Value="{StaticResource AppTypeRenameSoftBrush}" />
+                <Setter Property="Background" Value="{DynamicResource AppTypeRenameSoftBrush}" />
             </DataTrigger>
             <DataTrigger Binding="{Binding Kind}" Value="Other">
-                <Setter Property="Background" Value="{StaticResource AppTypeOtherSoftBrush}" />
+                <Setter Property="Background" Value="{DynamicResource AppTypeOtherSoftBrush}" />
             </DataTrigger>
         </Style.Triggers>
     </Style>
 
     <!-- 徽章 / 统计数字的类型主色（按条目的 Kind 映射，供文本复用） -->
     <Style x:Key="AppKindText" TargetType="TextBlock">
-        <Setter Property="Foreground" Value="{StaticResource AppTypeAddBrush}" />
+        <Setter Property="Foreground" Value="{DynamicResource AppTypeAddBrush}" />
         <Style.Triggers>
             <DataTrigger Binding="{Binding Kind}" Value="Deleted">
-                <Setter Property="Foreground" Value="{StaticResource AppTypeDeleteBrush}" />
+                <Setter Property="Foreground" Value="{DynamicResource AppTypeDeleteBrush}" />
             </DataTrigger>
             <DataTrigger Binding="{Binding Kind}" Value="Modified">
-                <Setter Property="Foreground" Value="{StaticResource AppTypeModifyBrush}" />
+                <Setter Property="Foreground" Value="{DynamicResource AppTypeModifyBrush}" />
             </DataTrigger>
             <DataTrigger Binding="{Binding Kind}" Value="Renamed">
-                <Setter Property="Foreground" Value="{StaticResource AppTypeRenameBrush}" />
+                <Setter Property="Foreground" Value="{DynamicResource AppTypeRenameBrush}" />
             </DataTrigger>
             <DataTrigger Binding="{Binding Kind}" Value="Other">
-                <Setter Property="Foreground" Value="{StaticResource AppTypeOtherBrush}" />
+                <Setter Property="Foreground" Value="{DynamicResource AppTypeOtherBrush}" />
             </DataTrigger>
         </Style.Triggers>
     </Style>
@@ -791,42 +791,42 @@
         <Setter Property="Height" Value="10" />
         <Setter Property="RadiusX" Value="3" />
         <Setter Property="RadiusY" Value="3" />
-        <Setter Property="Fill" Value="{StaticResource AppTypeAddBrush}" />
+        <Setter Property="Fill" Value="{DynamicResource AppTypeAddBrush}" />
         <Style.Triggers>
             <DataTrigger Binding="{Binding Kind}" Value="Deleted">
-                <Setter Property="Fill" Value="{StaticResource AppTypeDeleteBrush}" />
+                <Setter Property="Fill" Value="{DynamicResource AppTypeDeleteBrush}" />
             </DataTrigger>
             <DataTrigger Binding="{Binding Kind}" Value="Modified">
-                <Setter Property="Fill" Value="{StaticResource AppTypeModifyBrush}" />
+                <Setter Property="Fill" Value="{DynamicResource AppTypeModifyBrush}" />
             </DataTrigger>
             <DataTrigger Binding="{Binding Kind}" Value="Renamed">
-                <Setter Property="Fill" Value="{StaticResource AppTypeRenameBrush}" />
+                <Setter Property="Fill" Value="{DynamicResource AppTypeRenameBrush}" />
             </DataTrigger>
             <DataTrigger Binding="{Binding Kind}" Value="Other">
-                <Setter Property="Fill" Value="{StaticResource AppTypeOtherBrush}" />
+                <Setter Property="Fill" Value="{DynamicResource AppTypeOtherBrush}" />
             </DataTrigger>
         </Style.Triggers>
     </Style>
 
     <!-- 类型徽章（原型 .pill：10.5px 粗体、圆角 9、类型浅底 + 主色字；颜色在文字样式上） -->
     <Style x:Key="AppTypeBadge" TargetType="Border">
-        <Setter Property="Background" Value="{StaticResource AppTypeAddSoftBrush}" />
+        <Setter Property="Background" Value="{DynamicResource AppTypeAddSoftBrush}" />
         <Setter Property="CornerRadius" Value="9" />
         <Setter Property="Padding" Value="7,1.5" />
         <Setter Property="VerticalAlignment" Value="Center" />
         <Setter Property="SnapsToDevicePixels" Value="True" />
         <Style.Triggers>
             <DataTrigger Binding="{Binding Kind}" Value="Deleted">
-                <Setter Property="Background" Value="{StaticResource AppTypeDeleteSoftBrush}" />
+                <Setter Property="Background" Value="{DynamicResource AppTypeDeleteSoftBrush}" />
             </DataTrigger>
             <DataTrigger Binding="{Binding Kind}" Value="Modified">
-                <Setter Property="Background" Value="{StaticResource AppTypeModifySoftBrush}" />
+                <Setter Property="Background" Value="{DynamicResource AppTypeModifySoftBrush}" />
             </DataTrigger>
             <DataTrigger Binding="{Binding Kind}" Value="Renamed">
-                <Setter Property="Background" Value="{StaticResource AppTypeRenameSoftBrush}" />
+                <Setter Property="Background" Value="{DynamicResource AppTypeRenameSoftBrush}" />
             </DataTrigger>
             <DataTrigger Binding="{Binding Kind}" Value="Other">
-                <Setter Property="Background" Value="{StaticResource AppTypeOtherSoftBrush}" />
+                <Setter Property="Background" Value="{DynamicResource AppTypeOtherSoftBrush}" />
             </DataTrigger>
         </Style.Triggers>
     </Style>
@@ -850,13 +850,13 @@
     <Style x:Key="AppDeltaPlusText" TargetType="TextBlock">
         <Setter Property="FontFamily" Value="{StaticResource AppMonospaceFontFamily}" />
         <Setter Property="FontSize" Value="11" />
-        <Setter Property="Foreground" Value="{StaticResource AppSuccessBrush}" />
+        <Setter Property="Foreground" Value="{DynamicResource AppSuccessBrush}" />
         <Setter Property="VerticalAlignment" Value="Center" />
     </Style>
 
     <!-- -行数（原型 .delta .minus：mono 11px，err 色） -->
     <Style x:Key="AppDeltaMinusText" TargetType="TextBlock" BasedOn="{StaticResource AppDeltaPlusText}">
-        <Setter Property="Foreground" Value="{StaticResource AppDangerBrush}" />
+        <Setter Property="Foreground" Value="{DynamicResource AppDangerBrush}" />
     </Style>
 
     <!-- 无行数的补充说明（相似度 / 二进制 / 「其他」原因：mono 11px 主文字色） -->
@@ -950,8 +950,8 @@
         <ControlTemplate.Triggers>
             <!-- 选中：白色卡片观感（底 + 描边 + 投影）、图标转强调色、标题加粗 -->
             <Trigger Property="IsActive" Value="True">
-                <Setter TargetName="ItemBorder" Property="Background" Value="{StaticResource AppNavItemActiveBrush}" />
-                <Setter TargetName="ItemBorder" Property="BorderBrush" Value="{StaticResource AppCardBorderBrush}" />
+                <Setter TargetName="ItemBorder" Property="Background" Value="{DynamicResource AppNavItemActiveBrush}" />
+                <Setter TargetName="ItemBorder" Property="BorderBrush" Value="{DynamicResource AppCardBorderBrush}" />
                 <Setter TargetName="ItemBorder" Property="Effect" Value="{StaticResource AppCardShadowEffect}" />
                 <Setter TargetName="ActiveIndicator" Property="Opacity" Value="1" />
                 <Setter TargetName="IconPresenter" Property="TextElement.Foreground" Value="{StaticResource AppAccentBrush}" />
@@ -964,7 +964,7 @@
                     <Condition Property="IsMouseOver" Value="True" />
                     <Condition Property="IsActive" Value="False" />
                 </MultiTrigger.Conditions>
-                <Setter TargetName="ItemBorder" Property="Background" Value="{StaticResource AppNavItemHoverBrush}" />
+                <Setter TargetName="ItemBorder" Property="Background" Value="{DynamicResource AppNavItemHoverBrush}" />
             </MultiTrigger>
 
             <!-- 按下：在悬停底基础上再压深一层 -->
@@ -973,5 +973,112 @@
             </Trigger>
         </ControlTemplate.Triggers>
     </ControlTemplate>
+
+    <!-- ==================== 设置页（原型 .set-card / .set-row / .s-ico / .seg） ==================== -->
+    <!--
+        设置卡：原型 .set-card 是「卡片内上下各留 6px、行之间用 1px 分隔线」，
+        行的左右留白（20px）由行自己给，因此卡片的 Padding 只留纵向。
+    -->
+    <Style x:Key="AppSetCard" TargetType="Border">
+        <Setter Property="Margin" Value="0,14,0,0" />
+        <Setter Property="Padding" Value="0,6" />
+        <Setter Property="Background" Value="{DynamicResource AppCardBackgroundBrush}" />
+        <Setter Property="BorderBrush" Value="{DynamicResource AppCardBorderBrush}" />
+        <Setter Property="BorderThickness" Value="1" />
+        <Setter Property="CornerRadius" Value="{StaticResource CardCornerRadius}" />
+        <Setter Property="Effect" Value="{StaticResource AppCardShadowEffect}" />
+        <Setter Property="SnapsToDevicePixels" Value="True" />
+    </Style>
+
+    <!-- 设置行：原型 .set-row（padding 15/20、行间 1px 分隔线；最后一行把 BorderThickness 设 0） -->
+    <Style x:Key="AppSetRow" TargetType="Border">
+        <Setter Property="Padding" Value="20,15" />
+        <Setter Property="BorderBrush" Value="{DynamicResource AppDividerBrush}" />
+        <Setter Property="BorderThickness" Value="0,0,0,1" />
+        <Setter Property="SnapsToDevicePixels" Value="True" />
+    </Style>
+
+    <!-- 行首的图标块：原型 .s-ico（34×34、圆角 7、强调色 10% 底 + 强调色图标） -->
+    <Style x:Key="AppSetIcon" TargetType="Border">
+        <Setter Property="Width" Value="34" />
+        <Setter Property="Height" Value="34" />
+        <Setter Property="Background" Value="{StaticResource AppAccentSoftBrush}" />
+        <Setter Property="CornerRadius" Value="7" />
+        <Setter Property="SnapsToDevicePixels" Value="True" />
+    </Style>
+
+    <!-- 行的标题（原型 .s-t：13.5px、SemiBold）与说明（原型 .s-d：12px、次级色、行高 1.5） -->
+    <Style x:Key="AppSetTitle" TargetType="TextBlock">
+        <Setter Property="FontFamily" Value="{StaticResource AppFontFamily}" />
+        <Setter Property="FontSize" Value="13.5" />
+        <Setter Property="FontWeight" Value="SemiBold" />
+        <Setter Property="Foreground" Value="{DynamicResource TextFillColorPrimaryBrush}" />
+    </Style>
+
+    <Style x:Key="AppSetDescription" TargetType="TextBlock">
+        <Setter Property="FontFamily" Value="{StaticResource AppFontFamily}" />
+        <Setter Property="FontSize" Value="12" />
+        <Setter Property="Margin" Value="0,3,0,0" />
+        <Setter Property="LineHeight" Value="18" />
+        <Setter Property="TextWrapping" Value="Wrap" />
+        <Setter Property="Foreground" Value="{DynamicResource TextFillColorSecondaryBrush}" />
+    </Style>
+
+    <!-- 分段控件的容器：原型 .seg（#ECECEC 底、圆角 6、内边距 3、按钮间距 2） -->
+    <Style x:Key="AppSeg" TargetType="Border">
+        <Setter Property="Background" Value="{DynamicResource AppSegBackgroundBrush}" />
+        <Setter Property="CornerRadius" Value="6" />
+        <Setter Property="Padding" Value="3" />
+        <Setter Property="SnapsToDevicePixels" Value="True" />
+    </Style>
+
+    <!--
+        分段按钮：原型 .seg button（透明底、12.5px 次级色文字、内边距 5/14、圆角 4）与
+        .seg button.on（白底 + 主色文字 + SemiBold + 1px 投影）。
+        用自写模板而非 WpfUI 的 Appearance：选中态要靠 IsSelected 驱动，
+        WpfUI 的按钮外观由它自己的状态机决定，接不进来。
+    -->
+    <Style x:Key="AppSegButton" TargetType="Button">
+        <Setter Property="FontFamily" Value="{StaticResource AppFontFamily}" />
+        <Setter Property="FontSize" Value="12.5" />
+        <Setter Property="Foreground" Value="{DynamicResource TextFillColorSecondaryBrush}" />
+        <Setter Property="Margin" Value="1,0" />
+        <Setter Property="Padding" Value="14,5" />
+        <Setter Property="Cursor" Value="Hand" />
+        <Setter Property="FocusVisualStyle" Value="{x:Null}" />
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="Button">
+                    <Border
+                        x:Name="Chrome"
+                        Background="Transparent"
+                        CornerRadius="4"
+                        Padding="{TemplateBinding Padding}"
+                        SnapsToDevicePixels="True">
+                        <ContentPresenter
+                            HorizontalAlignment="Center"
+                            VerticalAlignment="Center"
+                            RecognizesAccessKey="True" />
+                    </Border>
+                    <ControlTemplate.Triggers>
+                        <!-- 选中态由数据驱动（绑定到 ThemeOptionItem.IsSelected） -->
+                        <DataTrigger Binding="{Binding IsSelected}" Value="True">
+                            <Setter TargetName="Chrome" Property="Background" Value="{DynamicResource AppSegSelectedBrush}" />
+                            <Setter TargetName="Chrome" Property="Effect" Value="{StaticResource AppSegShadowEffect}" />
+                            <Setter Property="Foreground" Value="{DynamicResource TextFillColorPrimaryBrush}" />
+                            <Setter Property="FontWeight" Value="SemiBold" />
+                        </DataTrigger>
+                        <MultiDataTrigger>
+                            <MultiDataTrigger.Conditions>
+                                <Condition Binding="{Binding IsSelected}" Value="False" />
+                                <Condition Binding="{Binding IsMouseOver, RelativeSource={RelativeSource Self}}" Value="True" />
+                            </MultiDataTrigger.Conditions>
+                            <Setter TargetName="Chrome" Property="Background" Value="{DynamicResource AppHoverOverlayBrush}" />
+                        </MultiDataTrigger>
+                    </ControlTemplate.Triggers>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
 
 </ResourceDictionary>

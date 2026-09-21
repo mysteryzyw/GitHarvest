@@ -44,7 +44,7 @@
                             Height="22"
                             HorizontalAlignment="Center"
                             VerticalAlignment="Center"
-                            Background="{StaticResource AppStepBadgeBrush}"
+                            Background="{DynamicResource AppStepBadgeBrush}"
                             CornerRadius="11">
                             <TextBlock
                                 x:Name="BadgeText"
@@ -71,7 +71,7 @@
                         Height="1.5"
                         Margin="12,0"
                         VerticalAlignment="Center"
-                        Background="{StaticResource AppStepLineBrush}" />
+                        Background="{DynamicResource AppStepLineBrush}" />
 
                 </StackPanel>
 
@@ -92,7 +92,7 @@
 
                     <!-- 已完成：绿色对勾徽章（对齐原型） -->
                     <DataTrigger Binding="{Binding State}" Value="Done">
-                        <Setter TargetName="Badge" Property="Background" Value="{StaticResource AppSuccessBrush}" />
+                        <Setter TargetName="Badge" Property="Background" Value="{DynamicResource AppSuccessBrush}" />
                         <Setter TargetName="BadgeText" Property="Foreground" Value="{StaticResource AppOnAccentBrush}" />
                         <Setter TargetName="BadgeText" Property="Text" Value="✓" />
                     </DataTrigger>

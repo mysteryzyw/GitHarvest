@@ -53,6 +53,14 @@ public sealed class TemplateService : ITemplateService
     }
 
     /// <inheritdoc />
+    public bool IsTemplateFileAvailable(string templatePath)
+    {
+        // File.Exists 对非法字符 / 超长等路径不抛异常、直接返回 false——与「读不到就走内置」的
+        // 总口径一致：可用性判定永远给结论，不把异常抛给调用方。
+        return !string.IsNullOrWhiteSpace(templatePath) && File.Exists(templatePath);
+    }
+
+    /// <inheritdoc />
     public RenderedNotes Render(string templateText, NotesTemplateContext context)
     {
         ArgumentNullException.ThrowIfNull(templateText);

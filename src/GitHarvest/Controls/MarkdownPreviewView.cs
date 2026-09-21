@@ -75,14 +75,17 @@ public sealed class MarkdownPreviewView : ContentControl
                 }
 
                 // 原型 .md-view h1：底部细分隔线 + 8px 下内边距。
-                return new Border
+                var bordered = new Border
                 {
                     BorderThickness = new Thickness(0, 0, 0, 1),
-                    BorderBrush = ResolveBrush("AppStrokeBrush", new SolidColorBrush(Color.FromRgb(0xE4, 0xE4, 0xE4))),
                     Padding = new Thickness(0, 0, 0, 8),
                     Margin = new Thickness(0, 0, 0, 4),
                     Child = text,
                 };
+
+                // 分隔线用动态资源引用（理由同行内代码底色：切主题后不能留着旧色）。
+                bordered.SetResourceReference(Border.BorderBrushProperty, "AppStrokeBrush");
+                return bordered;
             }
 
             case MarkdownListItemBlock item:
@@ -149,7 +152,9 @@ public sealed class MarkdownPreviewView : ContentControl
                 case MarkdownInlineKind.Code:
                     run.FontFamily = ResolveMonospaceFont();
                     run.FontSize = 11.5;
-                    run.Background = ResolveBrush("AppTypeOtherSoftBrush", new SolidColorBrush(Color.FromRgb(0xF0, 0xF0, 0xF0)));
+                    // 用动态资源引用而不是取一次画刷实例：行内代码的底色随主题变化，
+                    // 取实例会在切主题后留着旧色（本控件只在 Blocks 变化时重建）。
+                    run.SetResourceReference(TextElement.BackgroundProperty, "AppTypeOtherSoftBrush");
                     break;
             }
 
@@ -162,8 +167,4 @@ public sealed class MarkdownPreviewView : ContentControl
     /// <summary>取主题里的等宽字体（与 MonospaceText 样式同源）；资源缺失时退回 Consolas。</summary>
     private FontFamily ResolveMonospaceFont()
         => TryFindResource("AppMonospaceFontFamily") as FontFamily ?? new FontFamily("Consolas");
-
-    /// <summary>按键取主题画刷；离屏渲染等场景找不到资源时用给定的回退值。</summary>
-    private Brush ResolveBrush(string key, Brush fallback)
-        => TryFindResource(key) as Brush ?? fallback;
 }

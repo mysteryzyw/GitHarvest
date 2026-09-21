@@ -47,7 +47,7 @@
                         Margin="0,0,10,0"
                         VerticalAlignment="Center"
                         FontSize="16"
-                        Foreground="{StaticResource AppDangerBrush}"
+                        Foreground="{DynamicResource AppDangerBrush}"
                         Symbol="ErrorCircle24" />
 
                     <TextBlock
@@ -96,7 +96,7 @@
                         Margin="0,0,10,0"
                         VerticalAlignment="Center"
                         FontSize="16"
-                        Foreground="{StaticResource AppDangerBrush}"
+                        Foreground="{DynamicResource AppDangerBrush}"
                         Symbol="ErrorCircle24" />
 
                     <TextBlock
@@ -257,7 +257,7 @@
                             <StackPanel Margin="0,14,0,0" Orientation="Horizontal">
                                 <ui:SymbolIcon
                                     FontSize="20"
-                                    Foreground="{StaticResource AppSuccessBrush}"
+                                    Foreground="{DynamicResource AppSuccessBrush}"
                                     Symbol="CheckmarkCircle24" />
                                 <TextBlock
                                     Margin="8,0,0,0"
@@ -288,7 +288,7 @@
                                     </StackPanel>
                                 </Border>
 
-                                <!-- bare 仓库没有工作区，显式标注提醒导出结果只来自提交数据 -->
+                                <!-- bare 仓库没有工作区，显式标注提醒更新包只来自提交数据 -->
                                 <Border Margin="8,0,0,0">
                                     <Border.Style>
                                         <Style BasedOn="{StaticResource AppMonoChip}" TargetType="Border">
@@ -331,7 +331,7 @@
                                     <ui:SymbolIcon
                                         Grid.Column="0"
                                         FontSize="16"
-                                        Foreground="{StaticResource AppWarnBrush}"
+                                        Foreground="{DynamicResource AppWarnBrush}"
                                         Symbol="Warning24" />
                                     <TextBlock
                                         Grid.Column="1"
@@ -386,7 +386,7 @@
                                 <!-- 原型 .stat-mini .card：上下 14 左右 16 内边距；嵌套卡比外层卡面亮两级 -->
                                 <Style x:Key="StatCard" BasedOn="{StaticResource AppCard}" TargetType="Border">
                                     <Setter Property="Padding" Value="16,14" />
-                                    <Setter Property="Background" Value="{StaticResource AppRaisedCardBackgroundBrush}" />
+                                    <Setter Property="Background" Value="{DynamicResource AppRaisedCardBackgroundBrush}" />
                                 </Style>
                                 <Style x:Key="StatNumber" TargetType="TextBlock">
                                     <Setter Property="FontFamily" Value="{StaticResource AppFontFamily}" />

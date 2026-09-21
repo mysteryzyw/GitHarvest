@@ -29,15 +29,39 @@ internal sealed class FolderOpener : IFolderOpener
             return false;
         }
 
+        return StartProcess(directoryPath, arguments: null, "目录");
+    }
+
+    /// <inheritdoc />
+    public bool RevealFile(string filePath)
+    {
+        if (string.IsNullOrWhiteSpace(filePath) || !File.Exists(filePath))
+        {
+            _logger.Warning("要定位的文件不存在：{FilePath}", filePath);
+            return false;
+        }
+
+        // 交给资源管理器选中该文件：/select 需要一个已存在的路径，上面已经确认过。
+        return StartProcess("explorer.exe", $"/select,\"{filePath}\"", "文件");
+    }
+
+    /// <summary>启动一个交给系统处理的目标；失败记 Warning 并返回假（不抛异常）。</summary>
+    private bool StartProcess(string fileName, string? arguments, string description)
+    {
         try
         {
-            // UseShellExecute 交给系统决定用什么程序打开：与在资源管理器里双击目录一致。
-            Process.Start(new ProcessStartInfo { FileName = directoryPath, UseShellExecute = true });
+            var startInfo = new ProcessStartInfo { FileName = fileName, UseShellExecute = true };
+            if (arguments is not null)
+            {
+                startInfo.Arguments = arguments;
+            }
+
+            Process.Start(startInfo);
             return true;
         }
         catch (Exception exception) when (exception is IOException or InvalidOperationException or System.ComponentModel.Win32Exception)
         {
-            _logger.Warning(exception, "打开目录失败：{DirectoryPath}", directoryPath);
+            _logger.Warning(exception, "打开{Description}失败：{Target}", description, fileName);
             return false;
         }
     }

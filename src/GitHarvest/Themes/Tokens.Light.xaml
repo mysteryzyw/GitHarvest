@@ -1,0 +1,129 @@
+<ResourceDictionary
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:sys="clr-namespace:System;assembly=System.Runtime">
+
+    <!--
+        随主题变化的令牌——浅色一档（原型 docs/prototype/ui-fluent/index.html 的取值）。
+        与 Tokens.Dark.xaml 必须定义**完全相同的一组键**：ThemeService 在切换主题时整体替换本字典，
+        少一个键就会让切换后的界面露出空洞（动态资源解析不到即回到默认值，是静默的）。
+        两个文件的键顺序保持一致，便于逐条比对。
+
+        引用约定：这组令牌在 XAML 里**必须用 `{DynamicResource}`**（静态引用会把值钉死在加载时刻，
+        切主题时不会更新）。不随主题变化的令牌（强调色、字体、圆角、投影）留在 Tokens.xaml。
+        新增键时**两个档位一起加**，否则只在一种主题下正确。
+    -->
+
+    <!--
+        标记键：让 ThemeService 能在 MergedDictionaries 里认出「主题令牌字典」这一个条目
+        （该集合不能带 x:Key，只能靠内容标记定位）。两个档位文件都带它。
+    -->
+    <sys:String x:Key="AppThemeTokensVariant">Light</sys:String>
+
+    <!-- ==================== 状态色 ==================== -->
+    <SolidColorBrush x:Key="AppSuccessBrush" Color="#FF107C10" />
+    <SolidColorBrush x:Key="AppSuccessSoftBrush" Color="#FFDFF6DD" />
+    <!-- 成功横幅的正文色：比主色更深，浅绿底上才够对比度 -->
+    <SolidColorBrush x:Key="AppSuccessTextBrush" Color="#FF0B5D0B" />
+
+    <!--
+        错误提示横幅：原型 .banner.err 用的就是 :root 里的 err 与 err-bg 两个变量，
+        描边是 rgba(196,43,28,.25)（两档同值，在 Tokens.xaml），正文色比主色更深（浅底上够对比度）。
+    -->
+    <SolidColorBrush x:Key="AppDangerBrush" Color="#FFC42B1C" />
+    <SolidColorBrush x:Key="AppDangerSoftBrush" Color="#FFFDE7E9" />
+    <SolidColorBrush x:Key="AppDangerTextBrush" Color="#FF8C1D13" />
+
+    <!--
+        警告提示横幅：原型 :root 的 warn 与 warn-bg（.banner 只有 ok/err 两种，
+        warn 色取自类型徽章所在的同一套状态色；正文用更深的 #7F3D0E 保证浅黄底上的对比度）。
+    -->
+    <SolidColorBrush x:Key="AppWarnBrush" Color="#FFCA5010" />
+    <SolidColorBrush x:Key="AppWarnSoftBrush" Color="#FFFFF4CE" />
+    <SolidColorBrush x:Key="AppWarnTextBrush" Color="#FF7F3D0E" />
+
+    <!-- ==================== 变更类型五色（原型 :root 的 c-add / c-del / c-mod / c-ren / c-oth） ==================== -->
+    <!--
+        导出前总预览页的五类变更：类型徽章（.pill）、分组计数徽章（.g-badge）、
+        统计卡（.stat-card 的色块与数字）共用「主色 + 浅底色」一对。
+        新增 / 删除两对与状态色（ok / err）取值相同，但语义独立各留一份，
+        避免将来状态色调整时把类型徽章一起带偏。
+    -->
+    <SolidColorBrush x:Key="AppTypeAddBrush" Color="#FF107C10" />
+    <SolidColorBrush x:Key="AppTypeAddSoftBrush" Color="#FFDFF6DD" />
+    <SolidColorBrush x:Key="AppTypeDeleteBrush" Color="#FFC42B1C" />
+    <SolidColorBrush x:Key="AppTypeDeleteSoftBrush" Color="#FFFDE7E9" />
+    <SolidColorBrush x:Key="AppTypeModifyBrush" Color="#FF0067C0" />
+    <SolidColorBrush x:Key="AppTypeModifySoftBrush" Color="#FFE8F1FB" />
+    <SolidColorBrush x:Key="AppTypeRenameBrush" Color="#FF7A3FBF" />
+    <SolidColorBrush x:Key="AppTypeRenameSoftBrush" Color="#FFF1E9FB" />
+    <SolidColorBrush x:Key="AppTypeOtherBrush" Color="#FF5D5D5D" />
+    <SolidColorBrush x:Key="AppTypeOtherSoftBrush" Color="#FFF0F0F0" />
+
+    <!-- ==================== 中性色 ==================== -->
+    <SolidColorBrush x:Key="AppStrokeBrush" Color="#0F000000" />
+    <SolidColorBrush x:Key="AppStrokeStrongBrush" Color="#72000000" />
+    <SolidColorBrush x:Key="AppSurfaceBrush" Color="#CCFDFDFD" />
+    <SolidColorBrush x:Key="AppSurfaceMutedBrush" Color="#1F000000" />
+    <!-- 中性徽章底（提交栏的「基准」角色图标底）：不是变更类型色，单列一个中性灰 -->
+    <SolidColorBrush x:Key="AppNeutralBadgeBrush" Color="#FF5D5D5D" />
+
+    <!-- ==================== 卡片与浮起操作条 ==================== -->
+    <!--
+        原型卡片底色是 rgba(253,253,253,.78)，叠在页面底（243）上合成约 #FBFBFB。
+        WPF 里不能照抄这个半透明值：卡片的 DropShadowEffect 画在元素背后，
+        半透明卡面会把自家投影透出来，把卡面压暗约 5 级（实机采样 246 vs 原型 251）。
+        因此直接给等效的不透明合成色；嵌套卡（原型「卡底再叠一层 78% 白」≈ 253）再亮两级，
+        两者靠 1px 描边区分。深色档按同一「相对亮度关系」取值。
+    -->
+    <SolidColorBrush x:Key="AppCardBackgroundBrush" Color="#FFFBFBFB" />
+    <SolidColorBrush x:Key="AppRaisedCardBackgroundBrush" Color="#FFFDFDFD" />
+    <!-- 原型 .card 的 card-border: rgba(0,0,0,.0578) -->
+    <SolidColorBrush x:Key="AppCardBorderBrush" Color="#0F000000" />
+    <!-- 原型 .range-bar 的 background: rgba(252,252,252,.92)：同样给等效不透明色 -->
+    <SolidColorBrush x:Key="AppBarBackgroundBrush" Color="#FFFCFCFC" />
+
+    <!-- ==================== 交互叠加（悬停 / 按下） ==================== -->
+    <!-- 一律是「叠在最上层的一层淡色」：浅色档用黑、深色档必须换成白，否则完全看不见 -->
+    <!-- 列表行、可点区域的悬停底（原型 rgba(0,0,0,.04) 系） -->
+    <SolidColorBrush x:Key="AppHoverOverlayBrush" Color="#0A000000" />
+    <!-- 幽灵按钮的悬停 / 按下底（原型 .btn.subtle:hover 的 rgba(0,0,0,.05)） -->
+    <SolidColorBrush x:Key="AppGhostHoverBrush" Color="#0D000000" />
+    <SolidColorBrush x:Key="AppGhostPressedBrush" Color="#14000000" />
+    <!-- 悬停时转深的中性描边（原型 .pill:hover 的 20% 黑） -->
+    <SolidColorBrush x:Key="AppHoverBorderBrush" Color="#33000000" />
+
+    <!-- ==================== 等宽小徽章（原型 .chip.mono：分支名、短哈希） ==================== -->
+    <SolidColorBrush x:Key="AppChipBackgroundBrush" Color="#FFEFEFEF" />
+
+    <!-- ==================== 导航区与窗口底色 ==================== -->
+    <!-- 原型 .nav-item:hover: rgba(0,0,0,.045)；active: 白色卡片 -->
+    <SolidColorBrush x:Key="AppNavItemHoverBrush" Color="#0B000000" />
+    <SolidColorBrush x:Key="AppNavItemActiveBrush" Color="#FFFCFCFC" />
+    <!-- 原型导航区的白底 background: rgba(255,255,255,.30) -->
+    <SolidColorBrush x:Key="AppNavPaneBackgroundBrush" Color="#4DFFFFFF" />
+    <!-- 原型标题栏的白底 background: rgba(255,255,255,.35) -->
+    <SolidColorBrush x:Key="AppTitleBarBackgroundBrush" Color="#59FFFFFF" />
+    <!-- 原型 .window 的底色 rgba(243,243,243,.86)：86% 不透明的中性灰盖在 Mica 之上 -->
+    <SolidColorBrush x:Key="AppWindowBackgroundBrush" Color="#DBF3F3F3" />
+
+    <!-- ==================== 步骤指示条 ==================== -->
+    <!-- 原型 .step .n 未到达态背景 #E4E4E4；.step .line 连接线 #D6D6D6 -->
+    <SolidColorBrush x:Key="AppStepBadgeBrush" Color="#FFE4E4E4" />
+    <SolidColorBrush x:Key="AppStepLineBrush" Color="#FFD6D6D6" />
+
+    <!-- ==================== 设置页：行分隔线与分段控件 ==================== -->
+    <!-- 原型 .set-row 的行分隔线（CSS 变量 divider）＝ rgba(0,0,0,.06) -->
+    <SolidColorBrush x:Key="AppDividerBrush" Color="#0F000000" />
+    <!-- 原型 .seg 的底 #ECECEC 与选中项的白底（.seg button.on） -->
+    <SolidColorBrush x:Key="AppSegBackgroundBrush" Color="#FFECECEC" />
+    <SolidColorBrush x:Key="AppSegSelectedBrush" Color="#FFFFFFFF" />
+
+    <!-- ==================== 预览页分组卡的卡头（原型 .g-head 的半透明白底） ==================== -->
+    <SolidColorBrush x:Key="AppGroupHeadBrush" Color="#73FFFFFF" />
+    <SolidColorBrush x:Key="AppGroupHeadHoverBrush" Color="#BFFFFFFF" />
+
+    <!-- ==================== 提交栏页签（原型 .tab 的选中/悬停白底） ==================== -->
+    <SolidColorBrush x:Key="AppTabSelectedBrush" Color="#FFFFFFFF" />
+
+</ResourceDictionary>

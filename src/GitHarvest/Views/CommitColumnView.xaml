@@ -201,7 +201,7 @@
                     TextAlignment="Center">
                     <TextBlock.Style>
                         <Style BasedOn="{StaticResource HintText}" TargetType="TextBlock">
-                            <Setter Property="Foreground" Value="{StaticResource AppDangerBrush}" />
+                            <Setter Property="Foreground" Value="{DynamicResource AppDangerBrush}" />
                             <Setter Property="Visibility" Value="Collapsed" />
                             <Style.Triggers>
                                 <DataTrigger Binding="{Binding HasLoadError}" Value="True">

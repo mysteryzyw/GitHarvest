@@ -190,7 +190,7 @@
                         <ui:SymbolIcon
                             Grid.Column="0"
                             FontSize="16"
-                            Foreground="{StaticResource AppDangerBrush}"
+                            Foreground="{DynamicResource AppDangerBrush}"
                             Symbol="ErrorCircle24" />
                         <TextBlock
                             Grid.Column="1"
@@ -226,7 +226,7 @@
                         <ui:SymbolIcon
                             Grid.Column="0"
                             FontSize="16"
-                            Foreground="{StaticResource AppWarnBrush}"
+                            Foreground="{DynamicResource AppWarnBrush}"
                             Symbol="Warning24" />
                         <TextBlock
                             Grid.Column="1"
@@ -547,7 +547,7 @@
 
                                     <!-- 组体：展开时显示文件行（折叠即整块隐藏） -->
                                     <Border
-                                        BorderBrush="{StaticResource AppCardBorderBrush}"
+                                        BorderBrush="{DynamicResource AppCardBorderBrush}"
                                         BorderThickness="0,1,0,0"
                                         Visibility="{Binding IsExpanded, Converter={StaticResource AppBooleanToVisibilityConverter}}">
                                         <ItemsControl ItemsSource="{Binding Items}">
@@ -556,13 +556,13 @@
                                                     <!-- 文件行（原型 .f-row：悬停浅灰底；行间 1px 细分隔线） -->
                                                     <Border
                                                         Padding="8,8,16,8"
-                                                        BorderBrush="#09000000"
+                                                        BorderBrush="{DynamicResource AppDividerBrush}"
                                                         BorderThickness="0,0,0,1">
                                                         <Border.Style>
                                                             <Style TargetType="Border">
                                                                 <Style.Triggers>
                                                                     <Trigger Property="IsMouseOver" Value="True">
-                                                                        <Setter Property="Background" Value="#07000000" />
+                                                                        <Setter Property="Background" Value="{DynamicResource AppHoverOverlayBrush}" />
                                                                     </Trigger>
                                                                 </Style.Triggers>
                                                             </Style>

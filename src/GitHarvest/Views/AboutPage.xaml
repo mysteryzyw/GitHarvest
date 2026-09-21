@@ -1,23 +1,138 @@
 <Page
     x:Class="GitHarvest.Views.AboutPage"
     xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
-    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:ui="http://schemas.lepo.co/wpfui/2022/xaml">
 
-    <!-- 关于页（并列工具页，不在四步工作流上）。本 ticket 只放骨架占位，业务在 ticket 12 落地。 -->
+    <!--
+        关于页（并列工具页，不在四步工作流上）：对齐原型「页 6：关于」的居中卡片
+        （44px 图标 + 22px 应用名 + 副标题 + 一行小字），在这之上补 spec 用户故事 47 要求的三项信息——
+        原型的关于页是概念稿，只有名字与技术栈，没有版本与作者。
+        一行的价值是「支持沟通时报版本」，因此三项都取真实值：
+        应用版本 = 程序集版本，git 版本 = 探测结果，作者 = 暂留占位（仓库无作者元数据，所有者决议）。
+    -->
 
     <ScrollViewer HorizontalScrollBarVisibility="Disabled" VerticalScrollBarVisibility="Auto">
         <StackPanel Style="{StaticResource PageLayout}">
 
-            <TextBlock Style="{StaticResource PageTitleText}" Text="{Binding CurrentTitle}" />
+            <TextBlock Style="{StaticResource PageTitleText}" Text="{Binding Shell.CurrentTitle}" />
             <TextBlock Style="{StaticResource PageSubtitleText}" Text="应用版本、git 版本与作者信息。" />
 
-            <Border Margin="0,20,0,0" Style="{StaticResource AppCard}">
-                <StackPanel>
-                    <TextBlock Style="{StaticResource SectionHeaderText}" Text="骨架占位" />
+            <Border
+                MaxWidth="560"
+                Margin="0,60,0,0"
+                HorizontalAlignment="Center">
+                <Border.Style>
+                    <Style BasedOn="{StaticResource AppCard}" TargetType="Border">
+                        <Setter Property="Padding" Value="40" />
+                        <Setter Property="MinWidth" Value="420" />
+                    </Style>
+                </Border.Style>
+
+                <StackPanel HorizontalAlignment="Center">
+                    <ui:SymbolIcon
+                        HorizontalAlignment="Center"
+                        FontSize="44"
+                        Foreground="{StaticResource AppAccentBrush}"
+                        Symbol="BranchFork24" />
+
+                    <TextBlock
+                        Margin="0,12,0,0"
+                        HorizontalAlignment="Center"
+                        FontSize="22"
+                        FontWeight="SemiBold"
+                        Foreground="{DynamicResource TextFillColorPrimaryBrush}"
+                        Text="GitHarvest" />
+
                     <TextBlock
                         Margin="0,6,0,0"
-                        Style="{StaticResource HintText}"
-                        Text="本页尚无内容。计划落地内容：应用版本、探测到的 git 版本与作者信息（ticket 12）。" />
+                        HorizontalAlignment="Center"
+                        FontSize="13"
+                        Foreground="{DynamicResource TextFillColorSecondaryBrush}"
+                        Text="本地 Git 仓库变更导出工具" />
+
+                    <!-- 三项信息：左标签右取值，标签固定宽让取值左缘对齐 -->
+                    <StackPanel Margin="0,24,0,0">
+                        <Grid Margin="0,0,0,10">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="88" />
+                                <ColumnDefinition Width="*" />
+                            </Grid.ColumnDefinitions>
+                            <TextBlock
+                                FontSize="12.5"
+                                Foreground="{DynamicResource TextFillColorTertiaryBrush}"
+                                Text="应用版本" />
+                            <TextBlock
+                                Grid.Column="1"
+                                FontFamily="{StaticResource AppMonospaceFontFamily}"
+                                FontSize="12.5"
+                                Foreground="{DynamicResource TextFillColorPrimaryBrush}"
+                                Text="{Binding ApplicationVersion}" />
+                        </Grid>
+
+                        <Grid Margin="0,0,0,10">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="88" />
+                                <ColumnDefinition Width="*" />
+                            </Grid.ColumnDefinitions>
+                            <TextBlock
+                                FontSize="12.5"
+                                Foreground="{DynamicResource TextFillColorTertiaryBrush}"
+                                Text="git 版本" />
+                            <StackPanel Grid.Column="1">
+                                <TextBlock
+                                    FontFamily="{StaticResource AppMonospaceFontFamily}"
+                                    FontSize="12.5"
+                                    Foreground="{DynamicResource TextFillColorPrimaryBrush}"
+                                    Text="{Binding GitVersionText}"
+                                    TextTrimming="CharacterEllipsis" />
+                                <!-- 可用时补一行可执行文件路径：报版本时能确认用的是哪一份 git -->
+                                <TextBlock
+                                    Margin="0,2,0,0"
+                                    FontSize="11.5"
+                                    Foreground="{DynamicResource TextFillColorTertiaryBrush}"
+                                    Text="{Binding GitExecutablePathText}"
+                                    TextTrimming="CharacterEllipsis" />
+                            </StackPanel>
+                        </Grid>
+
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="88" />
+                                <ColumnDefinition Width="*" />
+                            </Grid.ColumnDefinitions>
+                            <TextBlock
+                                FontSize="12.5"
+                                Foreground="{DynamicResource TextFillColorTertiaryBrush}"
+                                Text="作者" />
+                            <TextBlock
+                                Grid.Column="1"
+                                FontSize="12.5"
+                                Foreground="{DynamicResource TextFillColorPrimaryBrush}"
+                                Text="{Binding Author}" />
+                        </Grid>
+                    </StackPanel>
+
+                    <!-- git 不可用时的引导（同一句文案首页也在用） -->
+                    <Border Margin="0,18,0,0" MaxWidth="420">
+                        <Border.Style>
+                            <Style BasedOn="{StaticResource AppWarningBanner}" TargetType="Border">
+                                <Style.Triggers>
+                                    <DataTrigger Binding="{Binding HasGitGuidance}" Value="False">
+                                        <Setter Property="Visibility" Value="Collapsed" />
+                                    </DataTrigger>
+                                </Style.Triggers>
+                            </Style>
+                        </Border.Style>
+                        <TextBlock Style="{StaticResource AppWarningText}" Text="{Binding GitGuidance}" />
+                    </Border>
+
+                    <TextBlock
+                        Margin="0,22,0,0"
+                        HorizontalAlignment="Center"
+                        FontSize="12"
+                        Foreground="{DynamicResource TextFillColorTertiaryBrush}"
+                        Text="{Binding RuntimeDescription}" />
                 </StackPanel>
             </Border>
 

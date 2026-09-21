@@ -7,13 +7,29 @@
     <Application.Resources>
         <ResourceDictionary>
             <ResourceDictionary.MergedDictionaries>
-                <!-- WpfUI 的 Fluent 主题与控件样式（浅色为默认；主题切换在 ticket 12） -->
+                <!--
+                    WpfUI 的 Fluent 主题与控件样式。Theme 只是**启动时的初始值**：
+                    真正的主题由 App.OnStartup 按设置调用 ApplicationThemeManager.Apply 决定，
+                    用户改设置时由 ThemeService 立即重应用（ticket 12）。
+                -->
                 <ui:ThemesDictionary Theme="Light" />
                 <ui:ControlsDictionary />
 
-                <!-- 应用自有样式：强调色与排版令牌、卡片与按钮样式 -->
+                <!--
+                    应用自有样式：强调色与排版令牌、卡片与按钮样式。
+                    顺序要紧：排在上面两个之后，同名的 WpfUI 键（如 AccentButtonBackground）
+                    才会被我们的取值覆盖。
+                -->
                 <ResourceDictionary Source="pack://application:,,,/GitHarvest;component/Themes/Tokens.xaml" />
                 <ResourceDictionary Source="pack://application:,,,/GitHarvest;component/Themes/Controls.xaml" />
+
+                <!--
+                    随主题变化的令牌，当前是浅色一档：ThemeService 切换主题时会把**这一个**字典
+                    整体换成 Tokens.Dark.xaml（靠字典里的 AppThemeTokensVariant 标记键定位，
+                    MergedDictionaries 是集合、不能带 x:Key）。
+                    排在最后，保证卡片底色这类键不被前面的字典盖掉。
+                -->
+                <ResourceDictionary Source="pack://application:,,,/GitHarvest;component/Themes/Tokens.Light.xaml" />
             </ResourceDictionary.MergedDictionaries>
         </ResourceDictionary>
     </Application.Resources>

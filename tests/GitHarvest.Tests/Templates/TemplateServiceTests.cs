@@ -273,6 +273,40 @@ public sealed class TemplateServiceTests : IDisposable
     }
 
     [Fact]
+    public void 模板文件存在时可用性判定为真()
+    {
+        var templatePath = Path.Combine(_directory.Path, "存在的模板.md");
+        File.WriteAllText(templatePath, "# 模板");
+        var service = CreateService(templatePath);
+
+        Assert.True(service.IsTemplateFileAvailable(templatePath));
+    }
+
+    [Fact]
+    public void 模板文件缺失或路径为空时可用性判定为假()
+    {
+        var missingPath = Path.Combine(_directory.Path, "已被移走的模板.md");
+        var service = CreateService(missingPath);
+
+        Assert.False(service.IsTemplateFileAvailable(missingPath));
+        // 未配置路径时同样不可用（按钮置灰的另一半口径）。
+        Assert.False(service.IsTemplateFileAvailable(string.Empty));
+    }
+
+    [Fact]
+    public void 可用性判定对目录与非法路径给假而不抛异常()
+    {
+        // 路径指向目录、或含非法字符（如手改 settings.json 写坏）：File.Exists 都返回 false，
+        // 可用性判定要的是「永远给结论」，绝不把异常抛给设置页。
+        var directoryAsTemplate = Path.Combine(_directory.Path, "模板目录");
+        Directory.CreateDirectory(directoryAsTemplate);
+        var service = CreateService(directoryAsTemplate);
+
+        Assert.False(service.IsTemplateFileAvailable(directoryAsTemplate));
+        Assert.False(service.IsTemplateFileAvailable(@"D:\模板\非法|字符.md"));
+    }
+
+    [Fact]
     public async Task 自定义模板读取失败时回退内置并提示()
     {
         // 路径指向一个目录而不是文件：ReadAllText 抛 IOException，与「丢失」同属回退分支。

@@ -1,24 +1,546 @@
 <Page
     x:Class="GitHarvest.Views.SettingsPage"
     xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
-    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:ui="http://schemas.lepo.co/wpfui/2022/xaml">
 
-    <!-- 全局设置页（并列工具页，不在四步工作流上）。本 ticket 只放骨架占位，业务在 ticket 12 落地。 -->
+    <!--
+        全局设置页（并列工具页，不在四步工作流上）：对齐原型 docs/prototype/ui-fluent/index.html 的
+        「页 5：全局设置」——两张设置卡，每行「图标 + 标题与说明 + 右侧控件」。
+        与原型的三处**有意差异**（记在 ticket 12 的完成说明里）：
+        ① 多了「git.exe 路径」一行（spec 用户故事 42 与验收第 3 条要求，原型没有这一行）；
+        ② 「默认说明模板」多了一个路径输入框（验收第 1 条要求四项都能在页内编辑，
+           原型只有「编辑模板…/恢复内置」两个按钮、路径只能手改 settings.json）；
+        ③ 少了「重命名相似度阈值」滑杆与「导出完成后打开输出文件夹」开关
+           —— 前者固定为 git 默认 50%（用户故事 27），可调会让每次导出的更新包不再可复现；
+           后者 spec 的全局设置四项不含（2026-09-21 所有者决议：都不做）。
+        保存是即时的（原型没有保存按钮）：文本框在失焦或回车时提交，点了就改的项立即写盘。
+    -->
 
     <ScrollViewer HorizontalScrollBarVisibility="Disabled" VerticalScrollBarVisibility="Auto">
         <StackPanel Style="{StaticResource PageLayout}">
 
-            <TextBlock Style="{StaticResource PageTitleText}" Text="{Binding CurrentTitle}" />
+            <TextBlock Style="{StaticResource PageTitleText}" Text="{Binding Shell.CurrentTitle}" />
             <TextBlock Style="{StaticResource PageSubtitleText}" Text="应用级配置，保存于 %APPDATA%\GitHarvest\settings.json；按仓库记住的值优先于全局默认。" />
 
-            <Border Margin="0,20,0,0" Style="{StaticResource AppCard}">
+            <!-- 保存失败必须让用户知道（否则界面显示新值、盘上还是旧值） -->
+            <Border Margin="0,16,0,0">
+                <Border.Style>
+                    <Style BasedOn="{StaticResource AppErrorBanner}" TargetType="Border">
+                        <Style.Triggers>
+                            <DataTrigger Binding="{Binding HasError}" Value="False">
+                                <Setter Property="Visibility" Value="Collapsed" />
+                            </DataTrigger>
+                        </Style.Triggers>
+                    </Style>
+                </Border.Style>
+                <TextBlock Style="{StaticResource AppBannerText}" Text="{Binding ErrorMessage}" />
+            </Border>
+
+            <!--
+                动作反馈：**高亮提示条**，与错误（红）/警告（黄）横幅同族。
+                即时保存本身不出提示（结果用户看得见），只有需要确认的动作才出这条；
+                有文件没能删掉（被占用）时转成警告色——绿条里带一句「有 N 个文件未能删除」会读成自相矛盾。
+            -->
+            <Border Margin="0,16,0,0">
+                <Border.Style>
+                    <Style BasedOn="{StaticResource AppSuccessBanner}" TargetType="Border">
+                        <Style.Triggers>
+                            <DataTrigger Binding="{Binding HasStatusMessage}" Value="False">
+                                <Setter Property="Visibility" Value="Collapsed" />
+                            </DataTrigger>
+                            <DataTrigger Binding="{Binding IsStatusWarning}" Value="True">
+                                <Setter Property="Background" Value="{DynamicResource AppWarnSoftBrush}" />
+                                <Setter Property="BorderBrush" Value="{StaticResource AppWarnBorderBrush}" />
+                            </DataTrigger>
+                        </Style.Triggers>
+                    </Style>
+                </Border.Style>
+
+                <Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="Auto" />
+                        <ColumnDefinition Width="10" />
+                        <ColumnDefinition Width="*" />
+                    </Grid.ColumnDefinitions>
+
+                    <ui:SymbolIcon Grid.Column="0" VerticalAlignment="Center" FontSize="16">
+                        <ui:SymbolIcon.Style>
+                            <Style TargetType="{x:Type ui:SymbolIcon}">
+                                <Setter Property="Symbol" Value="Checkmark24" />
+                                <Setter Property="Foreground" Value="{DynamicResource AppSuccessBrush}" />
+                                <Style.Triggers>
+                                    <DataTrigger Binding="{Binding IsStatusWarning}" Value="True">
+                                        <Setter Property="Symbol" Value="Warning24" />
+                                        <Setter Property="Foreground" Value="{DynamicResource AppWarnBrush}" />
+                                    </DataTrigger>
+                                </Style.Triggers>
+                            </Style>
+                        </ui:SymbolIcon.Style>
+                    </ui:SymbolIcon>
+
+                    <TextBlock Grid.Column="2" Text="{Binding StatusMessage}">
+                        <TextBlock.Style>
+                            <Style BasedOn="{StaticResource AppSuccessText}" TargetType="TextBlock">
+                                <Style.Triggers>
+                                    <DataTrigger Binding="{Binding IsStatusWarning}" Value="True">
+                                        <Setter Property="Foreground" Value="{DynamicResource AppWarnTextBrush}" />
+                                    </DataTrigger>
+                                </Style.Triggers>
+                            </Style>
+                        </TextBlock.Style>
+                    </TextBlock>
+                </Grid>
+            </Border>
+
+            <!-- ============ 卡 1：路径与模板 ============ -->
+            <Border Style="{StaticResource AppSetCard}">
                 <StackPanel>
-                    <TextBlock Style="{StaticResource SectionHeaderText}" Text="骨架占位" />
-                    <TextBlock
-                        Margin="0,6,0,0"
-                        Style="{StaticResource HintText}"
-                        Text="本页尚无设置项。计划落地内容：四项全局设置（可持久化）、主题浅色 / 深色 / 跟随系统即时切换、git.exe 手动路径校验、菜单「打开日志目录」（ticket 12）。" />
+
+                    <!-- 默认输出路径 -->
+                    <Border Style="{StaticResource AppSetRow}">
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="Auto" />
+                                <ColumnDefinition Width="16" />
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="16" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+
+                            <Border Grid.Column="0" Style="{StaticResource AppSetIcon}">
+                                <ui:SymbolIcon
+                                    HorizontalAlignment="Center"
+                                    VerticalAlignment="Center"
+                                    FontSize="17"
+                                    Foreground="{StaticResource AppAccentBrush}"
+                                    Symbol="Folder24" />
+                            </Border>
+
+                            <StackPanel Grid.Column="2">
+                                <TextBlock Style="{StaticResource AppSetTitle}" Text="默认输出路径" />
+                                <TextBlock Style="{StaticResource AppSetDescription}" Text="新仓库首次导出时的默认位置；各仓库记住的上次输出路径优先。" />
+                            </StackPanel>
+
+                            <StackPanel
+                                Grid.Column="4"
+                                VerticalAlignment="Top"
+                                Orientation="Horizontal">
+                                <ui:TextBox
+                                    Width="300"
+                                    Padding="10,5,10,5"
+                                    LostFocus="OnOutputPathLostFocus"
+                                    Text="{Binding DefaultOutputPath, UpdateSourceTrigger=PropertyChanged}"
+                                    ToolTip="留空表示未设置；导出前的总预览页仍可临时指定本次的输出路径">
+                                    <ui:TextBox.InputBindings>
+                                        <KeyBinding Key="Enter" Command="{Binding CommitOutputPathCommand}" />
+                                    </ui:TextBox.InputBindings>
+                                </ui:TextBox>
+                                <ui:Button
+                                    Margin="8,0,0,0"
+                                    Command="{Binding BrowseOutputPathCommand}"
+                                    Content="浏览…"
+                                    Style="{StaticResource AppSecondaryButton}" />
+                            </StackPanel>
+                        </Grid>
+                    </Border>
+
+                    <!-- 默认说明模板（决议 2：不做内置模板编辑器，做「打开模板文件 + 恢复内置」） -->
+                    <Border Style="{StaticResource AppSetRow}">
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="Auto" />
+                                <ColumnDefinition Width="16" />
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="16" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+
+                            <Border Grid.Column="0" Style="{StaticResource AppSetIcon}">
+                                <ui:SymbolIcon
+                                    HorizontalAlignment="Center"
+                                    VerticalAlignment="Center"
+                                    FontSize="17"
+                                    Foreground="{StaticResource AppAccentBrush}"
+                                    Symbol="DocumentText24" />
+                            </Border>
+
+                            <StackPanel Grid.Column="2">
+                                <TextBlock Style="{StaticResource AppSetTitle}" Text="默认说明模板" />
+                                <TextBlock Style="{StaticResource AppSetDescription}" Text="生成「更新说明.md」所用的 Markdown 模板，含 12 个中文占位符；留空即使用内置模板。" />
+                                <ui:TextBox
+                                    Margin="0,8,0,0"
+                                    HorizontalAlignment="Left"
+                                    MinWidth="360"
+                                    Padding="10,5,10,5"
+                                    LostFocus="OnTemplatePathLostFocus"
+                                    Text="{Binding TemplatePath, UpdateSourceTrigger=PropertyChanged}"
+                                    ToolTip="自定义模板 .md 文件的完整路径；文件缺失或读取失败时回退内置模板并提示">
+                                    <ui:TextBox.InputBindings>
+                                        <KeyBinding Key="Enter" Command="{Binding CommitTemplatePathCommand}" />
+                                    </ui:TextBox.InputBindings>
+                                </ui:TextBox>
+                                <TextBlock Style="{StaticResource AppSetDescription}" Text="模板丢失或读取失败时会自动回退内置模板并提示，不会让导出失败。" />
+                                <TextBlock
+                                    Style="{StaticResource AppSetDescription}"
+                                    Text="配置的模板文件当前不存在，已回退为内置模板；可修正路径或点「恢复内置」。"
+                                    Visibility="{Binding IsTemplateFileMissing, Converter={StaticResource AppBooleanToVisibilityConverter}}" />
+                            </StackPanel>
+
+                            <StackPanel
+                                Grid.Column="4"
+                                VerticalAlignment="Top"
+                                Orientation="Horizontal">
+                                <ui:Button
+                                    Command="{Binding OpenTemplateFileCommand}"
+                                    Content="打开模板文件"
+                                    Style="{StaticResource AppSecondaryButton}"
+                                    ToolTip="在资源管理器中定位模板文件，用你自己的编辑器修改" />
+                                <ui:Button
+                                    Margin="8,0,0,0"
+                                    Command="{Binding RestoreBuiltInTemplateCommand}"
+                                    Content="恢复内置"
+                                    Style="{StaticResource AppSubtleButton}"
+                                    ToolTip="清空自定义模板路径，改用内置模板" />
+                            </StackPanel>
+                        </Grid>
+                    </Border>
+
+                    <!--
+                        git.exe 路径：**原型没有这一行**，按 spec 用户故事 42 与 ticket 12 的验收补上。
+                        填完整路径或 Git 安装目录都可以（探测会自己补 git.exe）。
+                    -->
+                    <Border BorderThickness="0" Style="{StaticResource AppSetRow}">
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="Auto" />
+                                <ColumnDefinition Width="16" />
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="16" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+
+                            <Border Grid.Column="0" Style="{StaticResource AppSetIcon}">
+                                <ui:SymbolIcon
+                                    HorizontalAlignment="Center"
+                                    VerticalAlignment="Center"
+                                    FontSize="17"
+                                    Foreground="{StaticResource AppAccentBrush}"
+                                    Symbol="BranchFork24" />
+                            </Border>
+
+                            <StackPanel Grid.Column="2">
+                                <TextBlock Style="{StaticResource AppSetTitle}" Text="git.exe 路径" />
+                                <TextBlock Style="{StaticResource AppSetDescription}" Text="手动指定可覆盖自动探测（PATH → 常见安装路径）；可填完整路径，也可选 Git 安装目录。留空即用自动探测。" />
+                                <!-- 复验结果：生效为绿、未生效/不可用为黄（黄而非红：探测仍可能用自动结果正常工作） -->
+                                <TextBlock>
+                                    <TextBlock.Style>
+                                        <Style BasedOn="{StaticResource AppSetDescription}" TargetType="TextBlock">
+                                            <Setter Property="Foreground" Value="{DynamicResource AppWarnTextBrush}" />
+                                            <Style.Triggers>
+                                                <DataTrigger Binding="{Binding IsGitStatusSuccess}" Value="True">
+                                                    <Setter Property="Foreground" Value="{DynamicResource AppSuccessTextBrush}" />
+                                                </DataTrigger>
+                                                <DataTrigger Binding="{Binding GitStatusText}" Value="">
+                                                    <Setter Property="Visibility" Value="Collapsed" />
+                                                </DataTrigger>
+                                            </Style.Triggers>
+                                        </Style>
+                                    </TextBlock.Style>
+                                    <Run Text="{Binding GitStatusText, Mode=OneWay}" />
+                                </TextBlock>
+                            </StackPanel>
+
+                            <StackPanel
+                                Grid.Column="4"
+                                VerticalAlignment="Top"
+                                Orientation="Horizontal">
+                                <ui:TextBox
+                                    Width="300"
+                                    Padding="10,5,10,5"
+                                    LostFocus="OnGitExecutableLostFocus"
+                                    Text="{Binding GitExecutablePath, UpdateSourceTrigger=PropertyChanged}"
+                                    ToolTip="例如 D:\CodeTools\Git\cmd\git.exe">
+                                    <ui:TextBox.InputBindings>
+                                        <KeyBinding Key="Enter" Command="{Binding CommitGitExecutableCommand}" />
+                                    </ui:TextBox.InputBindings>
+                                </ui:TextBox>
+                                <ui:Button
+                                    Margin="8,0,0,0"
+                                    Command="{Binding BrowseGitExecutableCommand}"
+                                    Content="浏览…"
+                                    Style="{StaticResource AppSecondaryButton}" />
+                            </StackPanel>
+                        </Grid>
+                    </Border>
+
                 </StackPanel>
+            </Border>
+
+            <!-- ============ 卡 2：外观与数据 ============ -->
+            <Border Style="{StaticResource AppSetCard}">
+                <StackPanel>
+
+                    <!-- 外观主题：分段控件，点了立即生效（spec 用户故事 48） -->
+                    <Border Style="{StaticResource AppSetRow}">
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="Auto" />
+                                <ColumnDefinition Width="16" />
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="16" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+
+                            <Border Grid.Column="0" Style="{StaticResource AppSetIcon}">
+                                <ui:SymbolIcon
+                                    HorizontalAlignment="Center"
+                                    VerticalAlignment="Center"
+                                    FontSize="17"
+                                    Foreground="{StaticResource AppAccentBrush}"
+                                    Symbol="DarkTheme24" />
+                            </Border>
+
+                            <StackPanel Grid.Column="2">
+                                <TextBlock Style="{StaticResource AppSetTitle}" Text="外观主题" />
+                                <TextBlock Style="{StaticResource AppSetDescription}" Text="浅色 / 深色 / 跟随 Windows 系统主题，切换立即生效。" />
+                            </StackPanel>
+
+                            <Border
+                                Grid.Column="4"
+                                VerticalAlignment="Top"
+                                Style="{StaticResource AppSeg}">
+                                <ItemsControl ItemsSource="{Binding ThemeOptions}">
+                                    <ItemsControl.ItemsPanel>
+                                        <ItemsPanelTemplate>
+                                            <StackPanel Orientation="Horizontal" />
+                                        </ItemsPanelTemplate>
+                                    </ItemsControl.ItemsPanel>
+                                    <ItemsControl.ItemTemplate>
+                                        <DataTemplate>
+                                            <Button
+                                                Command="{Binding DataContext.SelectThemeCommand, RelativeSource={RelativeSource AncestorType=Page}}"
+                                                CommandParameter="{Binding}"
+                                                Content="{Binding Title}"
+                                                Style="{StaticResource AppSegButton}" />
+                                        </DataTemplate>
+                                    </ItemsControl.ItemTemplate>
+                                </ItemsControl>
+                            </Border>
+                        </Grid>
+                    </Border>
+
+                    <!-- 数据与日志：数据目录可改（迁移）、可清理、可设保留天数；「打开日志目录」直达 logs -->
+                    <Border Style="{StaticResource AppSetRow}">
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="Auto" />
+                                <ColumnDefinition Width="16" />
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="16" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+
+                            <Border Grid.Column="0" Style="{StaticResource AppSetIcon}">
+                                <ui:SymbolIcon
+                                    HorizontalAlignment="Center"
+                                    VerticalAlignment="Center"
+                                    FontSize="17"
+                                    Foreground="{StaticResource AppAccentBrush}"
+                                    Symbol="Server24" />
+                            </Border>
+
+                            <StackPanel Grid.Column="2">
+                                <TextBlock Style="{StaticResource AppSetTitle}" Text="数据与日志" />
+                                <StackPanel Margin="0,6,0,0" Orientation="Horizontal">
+                                    <Border Style="{StaticResource AppMonoChip}" ToolTip="{Binding DataDirectoryFullPath}">
+                                        <TextBlock Style="{StaticResource AppMonoChipText}" Text="{Binding DataDirectoryDisplay}" />
+                                    </Border>
+                                    <TextBlock
+                                        Margin="8,0,0,0"
+                                        VerticalAlignment="Center"
+                                        FontSize="12"
+                                        Foreground="{DynamicResource TextFillColorSecondaryBrush}"
+                                        Text="{Binding DataDirectoryHint}" />
+                                </StackPanel>
+                                <TextBlock Style="{StaticResource AppSetDescription}" Text="{Binding LogDirectoryFullPath}" ToolTip="日志目录（「打开日志目录」按钮直达这里）" />
+                            </StackPanel>
+
+                            <StackPanel
+                                Grid.Column="4"
+                                VerticalAlignment="Top"
+                                Orientation="Horizontal">
+                                <ui:Button
+                                    Command="{Binding BrowseDataDirectoryCommand}"
+                                    Content="更改目录…"
+                                    Style="{StaticResource AppSecondaryButton}"
+                                    ToolTip="把数据目录迁到别处（复制现有数据，原目录保留）" />
+                                <ui:Button
+                                    Margin="8,0,0,0"
+                                    Command="{Binding OpenLogDirectoryCommand}"
+                                    Content="打开日志目录"
+                                    Style="{StaticResource AppSecondaryButton}"
+                                    ToolTip="{Binding LogDirectoryFullPath}" />
+                            </StackPanel>
+                        </Grid>
+                    </Border>
+
+                    <!-- 定期清理：保留天数（0 = 不自动清理），提交后立即清一次 -->
+                    <Border Style="{StaticResource AppSetRow}">
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="Auto" />
+                                <ColumnDefinition Width="16" />
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="16" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+
+                            <Border Grid.Column="0" Style="{StaticResource AppSetIcon}">
+                                <ui:SymbolIcon
+                                    HorizontalAlignment="Center"
+                                    VerticalAlignment="Center"
+                                    FontSize="17"
+                                    Foreground="{StaticResource AppAccentBrush}"
+                                    Symbol="History24" />
+                            </Border>
+
+                            <StackPanel Grid.Column="2">
+                                <TextBlock Style="{StaticResource AppSetTitle}" Text="数据保留天数" />
+                                <TextBlock Style="{StaticResource AppSetDescription}" Text="启动时按它清理日志文件与导出历史；填 0 表示不自动清理。" />
+                                <TextBlock Style="{StaticResource AppSetDescription}" Text="{Binding RetentionHint}" />
+                            </StackPanel>
+
+                            <StackPanel
+                                Grid.Column="4"
+                                VerticalAlignment="Top"
+                                Orientation="Horizontal">
+                                <ui:TextBox
+                                    Width="90"
+                                    Padding="10,5,10,5"
+                                    LostFocus="OnRetentionDaysLostFocus"
+                                    Text="{Binding DataRetentionDays, UpdateSourceTrigger=PropertyChanged}"
+                                    ToolTip="0 表示不自动清理；上限 3650 天">
+                                    <ui:TextBox.InputBindings>
+                                        <KeyBinding Key="Enter" Command="{Binding CommitDataRetentionDaysCommand}" />
+                                    </ui:TextBox.InputBindings>
+                                </ui:TextBox>
+                                <TextBlock
+                                    Margin="8,0,0,0"
+                                    VerticalAlignment="Center"
+                                    FontSize="12.5"
+                                    Foreground="{DynamicResource TextFillColorSecondaryBrush}"
+                                    Text="天" />
+                            </StackPanel>
+                        </Grid>
+                    </Border>
+
+                    <!-- 手动删除：两档，都要二次确认（清理保留设置；重置等于恢复出厂） -->
+                    <Border BorderThickness="0" Style="{StaticResource AppSetRow}">
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="Auto" />
+                                <ColumnDefinition Width="16" />
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="16" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+
+                            <Border Grid.Column="0" Style="{StaticResource AppSetIcon}">
+                                <ui:SymbolIcon
+                                    HorizontalAlignment="Center"
+                                    VerticalAlignment="Center"
+                                    FontSize="17"
+                                    Foreground="{StaticResource AppAccentBrush}"
+                                    Symbol="Delete24" />
+                            </Border>
+
+                            <StackPanel Grid.Column="2">
+                                <TextBlock Style="{StaticResource AppSetTitle}" Text="删除数据" />
+                                <TextBlock Style="{StaticResource AppSetDescription}" Text="「清理」只删导出历史与日志（保留设置与最近仓库）；「重置」连设置与最近仓库一起删，等于恢复出厂。" />
+                                <TextBlock Style="{StaticResource AppSetDescription}" Text="两个动作都不可撤销，点击后会先让你确认一次。" />
+                            </StackPanel>
+
+                            <StackPanel
+                                Grid.Column="4"
+                                VerticalAlignment="Top"
+                                Orientation="Horizontal">
+                                <ui:Button
+                                    Command="{Binding RequestClearHistoryAndLogsCommand}"
+                                    Content="清理导出历史与日志…"
+                                    Style="{StaticResource AppSecondaryButton}" />
+                                <ui:Button
+                                    Margin="8,0,0,0"
+                                    Command="{Binding RequestResetAllDataCommand}"
+                                    Content="重置全部数据…"
+                                    Style="{StaticResource AppSecondaryButton}" />
+                            </StackPanel>
+                        </Grid>
+                    </Border>
+
+                </StackPanel>
+            </Border>
+
+            <!-- ============ 二次确认浮层 ============ -->
+            <!--
+                需要确认的动作都会动磁盘上的数据，因此不弹系统对话框而是页内浮层：
+                对话框会把用户从流程里拽出去（还得处理父子窗口的所有权），页内浮层与说明文案在同一屏里。
+            -->
+            <Border Margin="0,14,0,0">
+                <Border.Style>
+                    <Style BasedOn="{StaticResource AppCard}" TargetType="Border">
+                        <Setter Property="Padding" Value="20" />
+                        <Setter Property="BorderBrush" Value="{StaticResource AppAccentBorderBrush}" />
+                        <Style.Triggers>
+                            <DataTrigger Binding="{Binding HasPendingConfirmation}" Value="False">
+                                <Setter Property="Visibility" Value="Collapsed" />
+                            </DataTrigger>
+                        </Style.Triggers>
+                    </Style>
+                </Border.Style>
+
+                <Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="Auto" />
+                        <ColumnDefinition Width="14" />
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="14" />
+                        <ColumnDefinition Width="Auto" />
+                    </Grid.ColumnDefinitions>
+
+                    <ui:SymbolIcon
+                        Grid.Column="0"
+                        VerticalAlignment="Top"
+                        FontSize="20"
+                        Foreground="{StaticResource AppWarnBrush}"
+                        Symbol="Warning24" />
+
+                    <StackPanel Grid.Column="2">
+                        <TextBlock Style="{StaticResource AppSetTitle}" Text="{Binding ConfirmationTitle}" />
+                        <TextBlock
+                            Margin="0,6,0,0"
+                            FontSize="12.5"
+                            Foreground="{DynamicResource TextFillColorSecondaryBrush}"
+                            LineHeight="19"
+                            Text="{Binding ConfirmationMessage}"
+                            TextWrapping="Wrap" />
+                    </StackPanel>
+
+                    <StackPanel
+                        Grid.Column="4"
+                        VerticalAlignment="Top"
+                        Orientation="Horizontal">
+                        <ui:Button
+                            Command="{Binding ConfirmPendingActionCommand}"
+                            Content="{Binding ConfirmationActionText}"
+                            Style="{StaticResource AppPrimaryButton}" />
+                        <ui:Button
+                            Margin="8,0,0,0"
+                            Command="{Binding CancelPendingActionCommand}"
+                            Content="取消"
+                            Style="{StaticResource AppSubtleButton}" />
+                    </StackPanel>
+                </Grid>
             </Border>
 
         </StackPanel>

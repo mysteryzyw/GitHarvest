@@ -276,7 +276,7 @@
                         <ui:SymbolIcon
                             Grid.Column="0"
                             FontSize="16"
-                            Foreground="{StaticResource AppDangerBrush}"
+                            Foreground="{DynamicResource AppDangerBrush}"
                             Symbol="ErrorCircle24" />
                         <TextBlock
                             Grid.Column="1"
@@ -306,7 +306,7 @@
                         <ui:SymbolIcon
                             Grid.Column="0"
                             FontSize="16"
-                            Foreground="{StaticResource AppSuccessBrush}"
+                            Foreground="{DynamicResource AppSuccessBrush}"
                             Symbol="CheckmarkCircle24" />
                         <TextBlock
                             Grid.Column="1"
@@ -337,7 +337,7 @@
                         <ui:SymbolIcon
                             VerticalAlignment="Center"
                             FontSize="16"
-                            Foreground="{StaticResource AppSuccessBrush}"
+                            Foreground="{DynamicResource AppSuccessBrush}"
                             Symbol="CheckmarkCircle24" />
                         <!-- 加粗部分对齐原型 validBanner 的 <b>祖先校验通过</b> -->
                         <TextBlock
@@ -394,7 +394,7 @@
                         <ui:SymbolIcon
                             VerticalAlignment="Center"
                             FontSize="16"
-                            Foreground="{StaticResource AppDangerBrush}"
+                            Foreground="{DynamicResource AppDangerBrush}"
                             Symbol="ErrorCircle24" />
                         <!-- 加粗部分对齐原型 validBanner 的 <b>祖先校验失败</b>（所有者反馈：失败字体加粗） -->
                         <TextBlock
@@ -445,7 +445,7 @@
                         <ui:SymbolIcon
                             Grid.Column="0"
                             FontSize="16"
-                            Foreground="{StaticResource AppWarnBrush}"
+                            Foreground="{DynamicResource AppWarnBrush}"
                             Symbol="Warning24" />
                         <TextBlock
                             Grid.Column="1"
@@ -521,7 +521,7 @@
                             Text="{Binding Preview.ErrorMessage}">
                             <TextBlock.Style>
                                 <Style BasedOn="{StaticResource HintText}" TargetType="TextBlock">
-                                    <Setter Property="Foreground" Value="{StaticResource AppDangerBrush}" />
+                                    <Setter Property="Foreground" Value="{DynamicResource AppDangerBrush}" />
                                     <Setter Property="Visibility" Value="Collapsed" />
                                     <Style.Triggers>
                                         <DataTrigger Binding="{Binding Preview.HasError}" Value="True">
@@ -575,8 +575,8 @@
                             <Border
                                 Margin="0,10,0,0"
                                 Padding="12,10"
-                                Background="{StaticResource AppSurfaceMutedBrush}"
-                                BorderBrush="{StaticResource AppCardBorderBrush}"
+                                Background="{DynamicResource AppSurfaceMutedBrush}"
+                                BorderBrush="{DynamicResource AppCardBorderBrush}"
                                 BorderThickness="1"
                                 CornerRadius="6">
                                 <TextBlock Style="{StaticResource BodyText}" Text="{Binding Preview.Detail.FullMessage}" />
