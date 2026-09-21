@@ -27,4 +27,12 @@ public interface IRepositorySession
     /// 再恢复旧稿会张冠李戴）。尚未生成过草稿时为 <see langword="null"/>。
     /// </summary>
     string? NotesDraft { get; set; }
+
+    /// <summary>
+    /// 本次导出的输出路径（第 3 步行内更改写入，spec 用户故事 23）。
+    /// 它是「本次」档位：只影响本次会话，**不写回**每仓库记忆——随手试一个路径不该改掉
+    /// 该仓库记住的目的地；每仓库记忆只在本仓库**导出成功后**刷新（用户故事 43）。
+    /// 换仓库后由实现清空；未在页面改过时为 <see langword="null"/>（此时按记忆 / 全局默认解析）。
+    /// </summary>
+    string? SessionOutputPath { get; set; }
 }

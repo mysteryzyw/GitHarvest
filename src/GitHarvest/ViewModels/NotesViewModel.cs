@@ -577,6 +577,8 @@ public sealed partial class NotesViewModel : ObservableObject
                     result.PackagePath,
                     elapsed,
                     result.TotalBytes);
+
+                RememberOutputPath();
                 break;
 
             case ExportOutcome.ConflictBlocked:
@@ -628,7 +630,7 @@ public sealed partial class NotesViewModel : ObservableObject
         ? string.Create(CultureInfo.InvariantCulture, $"{elapsed.TotalSeconds:0.0} 秒")
         : string.Create(CultureInfo.InvariantCulture, $"{elapsed.TotalMilliseconds:0} 毫秒");
 
-    /// <summary>解析输出路径：每仓库上次优先，其次全局默认（用户故事 43）。</summary>
+    /// <summary>解析输出路径：本次行内改的值优先，其次每仓库上次，最后全局默认（用户故事 43）。</summary>
     private void ResolveOutputPath()
     {
         if (_session.OpenedRepository is not { } repository)
@@ -638,9 +640,36 @@ public sealed partial class NotesViewModel : ObservableObject
         }
 
         OutputPath = OutputPathResolver.Resolve(
-            sessionPath: null,
+            _session.SessionOutputPath,
             _settings.GetRepositoryState(repository.RootPath).LastOutputPath,
             _settings.Settings.DefaultOutputPath);
+    }
+
+    /// <summary>
+    /// 导出成功后把本次实际使用的输出路径写回该仓库的「上次输出路径」（用户故事 43）。
+    /// 时机选在**导出成功后**而不是页面里改一次就写：第 3 步的行内更改只是「本次」档位，
+    /// 只有真的用它导出过，才值得被这个仓库记住。值取输出路径（不含更新日期目录，与记忆语义一致）；
+    /// 取消、失败、空范围与冲突中止都不会走到这里。写入失败由设置服务降级为 Warning。
+    /// </summary>
+    private void RememberOutputPath()
+    {
+        if (_session.OpenedRepository is not { } repository || OutputPath.Length == 0)
+        {
+            return;
+        }
+
+        var state = _settings.GetRepositoryState(repository.RootPath);
+        if (string.Equals(state.LastOutputPath, OutputPath, StringComparison.OrdinalIgnoreCase))
+        {
+            // 本次用的就是记住的那个路径（最常见的情形）：没必要为同一个值再写一次盘。
+            return;
+        }
+
+        _settings.SaveRepositoryState(repository.RootPath, state with { LastOutputPath = OutputPath });
+        _logger.Information(
+            "已记住该仓库的输出路径：{RepositoryPath} → {OutputPath}",
+            repository.RootPath,
+            OutputPath);
     }
 
     /// <summary>回到「可以导出」的初始态（进入页面或重算前调用）。</summary>

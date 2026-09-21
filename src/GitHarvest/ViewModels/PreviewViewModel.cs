@@ -14,7 +14,7 @@ namespace GitHarvest.ViewModels;
 /// 导出前总预览页（工作流第 3 步）的状态：祖先校验与双点差异经
 /// <see cref="IExportService"/> 编排（不直接碰 git 进程），按变更类型分组展示文件
 /// 清单与统计，支持类型过滤（统计卡与 chip 同一过滤态）、路径筛选、组展开收起与
-/// 「重新计算」；输出路径在本页行内更改并按仓库记住。
+/// 「重新计算」；输出路径在本页行内更改（只改「本次」的目的地，记忆在第 4 步导出成功后刷新）。
 /// 范围来自 <see cref="IRepositorySession.SelectedRange"/>（第 2 步写入）；
 /// 未选定范围时显示引导卡。
 /// </summary>
@@ -243,11 +243,15 @@ public sealed partial class PreviewViewModel : ObservableObject
     [RelayCommand]
     private void SelectKind(ChangeKind? kind) => SelectedKind = kind;
 
-    /// <summary>「更改…」：文件夹选择器行内更改本次导出目的地，并按仓库记住（用户故事 43）。</summary>
+    /// <summary>
+    /// 「更改…」：文件夹选择器行内更改**本次**导出目的地（用户故事 23 的「本次」档位）。
+    /// 只写会话值、不写每仓库记忆——随手试一个路径不该改掉该仓库记住的目的地；
+    /// 记忆在导出成功后由第 4 步刷新（用户故事 43）。
+    /// </summary>
     [RelayCommand]
     private void ChangeOutputPath()
     {
-        if (_session.OpenedRepository is not { } repository)
+        if (_session.OpenedRepository is null)
         {
             return;
         }
@@ -261,11 +265,8 @@ public sealed partial class PreviewViewModel : ObservableObject
         OutputPath = picked;
         OnPropertyChanged(nameof(OutputPathDisplay));
 
-        // 每仓库状态（整体替换语义：先取出现状再改一个字段，ticket 03 的交接）。
-        // 写入失败由设置服务降级为 Warning（内存值仍生效），不打断本页操作。
-        var state = _settings.GetRepositoryState(repository.RootPath);
-        _settings.SaveRepositoryState(repository.RootPath, state with { LastOutputPath = picked });
-        _logger.Information("输出路径已更改并按仓库记住：{RepositoryPath} → {OutputPath}", repository.RootPath, picked);
+        _session.SessionOutputPath = picked;
+        _logger.Information("本次导出的输出路径已更改：{OutputPath}", picked);
     }
 
     /// <summary>全部分组展开。</summary>
@@ -306,7 +307,11 @@ public sealed partial class PreviewViewModel : ObservableObject
     [RelayCommand]
     private void GoToPickCommits() => _navigator.NavigateTo(ShellPage.PickCommits);
 
-    /// <summary>解析本次的默认输出路径：每仓库上次输出路径优先，其次全局默认（spec 用户故事 43）。</summary>
+    /// <summary>
+    /// 解析本次导出目的地：本次行内改的值 &gt; 每仓库上次 &gt; 全局默认（spec 用户故事 43）。
+    /// 三级规则走 Core 的 <see cref="OutputPathResolver"/>——与第 4 步共用同一份实现，
+    /// 避免两页各写一遍「取第一个非空」。
+    /// </summary>
     private void ResolveOutputPath()
     {
         if (_session.OpenedRepository is not { } repository)
@@ -315,11 +320,10 @@ public sealed partial class PreviewViewModel : ObservableObject
             return;
         }
 
-        var lastPath = _settings.GetRepositoryState(repository.RootPath).LastOutputPath;
-        OutputPath = firstNonEmpty(lastPath, _settings.Settings.DefaultOutputPath);
-
-        static string firstNonEmpty(string first, string second)
-            => first.Length > 0 ? first : second;
+        OutputPath = OutputPathResolver.Resolve(
+            _session.SessionOutputPath,
+            _settings.GetRepositoryState(repository.RootPath).LastOutputPath,
+            _settings.Settings.DefaultOutputPath);
     }
 
     /// <summary>过滤条件变化：从汇总重新投影统计卡、chip 与分组（展开态按类型保留）。</summary>
