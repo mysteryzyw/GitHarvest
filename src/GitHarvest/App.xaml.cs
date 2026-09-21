@@ -1,4 +1,4 @@
-using System.Reflection;
+﻿using System.Reflection;
 using System.Windows;
 using System.Windows.Media;
 using GitHarvest.Core.Export;
@@ -25,11 +25,41 @@ namespace GitHarvest;
 public partial class App : Application
 {
     private ServiceProvider? _services;
+    private MainWindow? _mainWindow;
+    private Mutex? _singleInstanceMutex;
+    private bool _ownsSingleInstanceMutex;
+    private EventWaitHandle? _restoreSignal;
+    private EventWaitHandle? _restoreWatcherExit;
+
+    /// <summary>单实例互斥体与唤起信号的名称（会话级——按用户会话隔离，不需要 Global\ 前缀）。</summary>
+    private const string SingleInstanceMutexName = @"Local\GitHarvest.SingleInstance";
+    private const string RestoreSignalName = @"Local\GitHarvest.RestoreSignal";
+    private const string RestoreWatcherExitName = @"Local\GitHarvest.RestoreWatcherExit";
 
     protected override void OnStartup(StartupEventArgs e)
     {
         base.OnStartup(e);
 
+        // 单实例（ticket 15）：第二个实例走到这里拿不到互斥体——不建容器、不初始化日志、
+        // 不开窗口，只向已有实例发「唤起」信号后立即退出。信号发不出去（首实例还在启动早期、
+        // 信号尚未创建）也只是这次唤不起，仍保证只有一个实例。
+        _singleInstanceMutex = new Mutex(initiallyOwned: true, SingleInstanceMutexName, out var isFirstInstance);
+        // 所有权记录：Mutex(initiallyOwned:true) 在 createdNew=false 时**并不拥有**互斥体，
+        // 此时调 ReleaseMutex 会抛 ApplicationException（冒烟实测）——只有首实例能释放。
+        _ownsSingleInstanceMutex = isFirstInstance;
+        if (!isFirstInstance)
+        {
+            if (EventWaitHandle.TryOpenExisting(RestoreSignalName, out var existingSignal))
+            {
+                using (existingSignal)
+                {
+                    existingSignal.Set();
+                }
+            }
+
+            Shutdown();
+            return;
+        }
 
         // 启动耗时基线（ticket 13 验收：体积与启动时间记录为后续优化基线）。
         // 从 OnStartup 进入起算到主窗口显示，日志里「主窗口已显示」一行就是测量点；
@@ -62,7 +92,13 @@ public partial class App : Application
         ControlsServices.Initialize(_services);
 
         var window = _services.GetRequiredService<MainWindow>();
+        _mainWindow = window;
 
+        // 单实例唤起（ticket 15）：首实例开一个后台等待线程，收到信号就把主窗口拉回前台。
+        // 放在窗口创建之后：事件对象从这一刻起才存在，第二个实例的 TryOpenExisting 才有东西可开。
+        _restoreSignal = new EventWaitHandle(initialState: false, EventResetMode.AutoReset, RestoreSignalName);
+        _restoreWatcherExit = new EventWaitHandle(initialState: false, EventResetMode.AutoReset, RestoreWatcherExitName);
+        StartRestoreWatcher();
 
         // 主题：按设置里的默认主题（浅色/深色/跟随系统）在**显示窗口之前**应用，
         // 免得先闪一帧浅色再跳成深色。「跟随系统」会在这里把窗口交给 WpfUI 的主题监视器，
@@ -91,10 +127,45 @@ public partial class App : Application
         Log.Information("GitHarvest 退出");
         Log.CloseAndFlush();
 
+        // 单实例收尾（ticket 15）：先停掉唤起监听线程再释放互斥体，顺序反了会有窗口期——
+        // 新实例拿得到互斥体却听不到唤起信号。IsBackground 线程本会随进程退出，显式收尾只为语义干净。
+        _restoreWatcherExit?.Set();
+        _restoreWatcherExit?.Dispose();
+        _restoreSignal?.Dispose();
+        if (_ownsSingleInstanceMutex)
+        {
+            _singleInstanceMutex?.ReleaseMutex();
+        }
+        _singleInstanceMutex?.Dispose();
+        _restoreWatcherExit = null;
+        _restoreSignal = null;
+        _singleInstanceMutex = null;
+
         _services?.Dispose();
         _services = null;
 
         base.OnExit(e);
+    }
+
+    /// <summary>
+    /// 后台等待唤起信号（ticket 15）。等的是 <see cref="_restoreSignal"/>（第二个实例 Set 的）与
+    /// <see cref="_restoreWatcherExit"/>（退出时 Set 的）二者之一：前者把主窗口拉回前台，后者结束线程。
+    /// </summary>
+    private void StartRestoreWatcher()
+    {
+        var waitHandles = new WaitHandle[] { _restoreSignal!, _restoreWatcherExit! };
+        var watcher = new Thread(() =>
+        {
+            while (WaitHandle.WaitAny(waitHandles) == 0)
+            {
+                Dispatcher.Invoke(() => _mainWindow?.RestoreFromTray());
+            }
+        })
+        {
+            IsBackground = true,
+            Name = "GitHarvest 单实例唤起监听",
+        };
+        watcher.Start();
     }
 
     private static ServiceProvider BuildServices(IDataLocation dataLocation)
@@ -196,6 +267,7 @@ public partial class App : Application
         }
     }
 
-    private static string ApplicationVersion =>
+    /// <summary>程序集版本（关于页与托盘 Tooltip 共用）。</summary>
+    internal static string ApplicationVersion =>
         Assembly.GetExecutingAssembly().GetName().Version?.ToString() ?? "未知";
 }
